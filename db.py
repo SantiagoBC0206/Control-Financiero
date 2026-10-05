@@ -154,6 +154,20 @@ def guardar_dia(fecha, ingresos, gastos, movimientos, observaciones=""):
         _guardar_dia_en(conn, fecha, ingresos, gastos, movimientos, observaciones)
 
 
+def guardar_varios_dias(dias):
+    """Guarda muchos días de una vez (todo o nada: si uno falla, no se guarda ninguno).
+
+    'dias' es una lista de diccionarios con: fecha, ingresos, gastos,
+    movimientos y (opcional) observaciones.
+    """
+    with _conexion() as conn:
+        for d in dias:
+            _guardar_dia_en(
+                conn, d["fecha"], d["ingresos"], d["gastos"], d["movimientos"],
+                d.get("observaciones", ""),
+            )
+
+
 def cargar_dia(fecha):
     """Devuelve un diccionario con el día, o None si no existe."""
     with _conexion() as conn:

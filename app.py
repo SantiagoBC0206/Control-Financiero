@@ -7,7 +7,7 @@ Ejecutar con:  streamlit run app.py
 import streamlit as st
 
 import db
-from paginas import inicio, registrar
+from paginas import importar, inicio, registrar
 from seguridad import verificar_password
 
 st.set_page_config(page_title="Control Financiero", page_icon="🚗", layout="centered")
@@ -19,10 +19,11 @@ if not verificar_password():
 # 2) Asegurar que las tablas existan
 db.init_db()
 
-# 3) Menú. Las pantallas nuevas (Reportes, Importar) se agregan aquí.
+# 3) Menú. Las pantallas nuevas (Reportes) se agregan aquí.
 PAGINAS = {
     "🏠 Inicio": inicio.mostrar,
     "➕ Registrar día": registrar.mostrar,
+    "📥 Importar Excel": importar.mostrar,
 }
 
 st.title("🚗 Control Financiero")

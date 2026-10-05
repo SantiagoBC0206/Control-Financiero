@@ -68,26 +68,27 @@ def _tab_hoy(df):
         if anterior is not None:
             st.caption(
                 f"Último día trabajado: {anterior['Fecha']:%d/%m/%Y} — "
-                f"ganancia {pesos(anterior['Ganancia Est'])}"
+                f"disponible {pesos(anterior['Total Disp'])}"
             )
         return
 
     f = fila_hoy.iloc[0]
     delta = None
     if anterior is not None:
-        delta = _delta(int(f["Ganancia Est"] - anterior["Ganancia Est"]))
-    st.metric("💰 Ganancia de hoy", pesos(f["Ganancia Est"]), delta=delta)
+        delta = _delta(int(f["Total Disp"] - anterior["Total Disp"]))
+    # Cifra principal: el dinero disponible
+    st.metric("💵 Disponible de hoy", pesos(f["Total Disp"]), delta=delta)
     if anterior is not None:
         st.caption(
             f"Comparado con el último día trabajado ({anterior['Fecha']:%d/%m/%Y}): "
-            f"{pesos(anterior['Ganancia Est'])}"
+            f"{pesos(anterior['Total Disp'])}"
         )
 
     c1, c2 = st.columns(2)
     c1.metric("📥 Ingresos", pesos(f["Total Ingresos"]))
     c2.metric("📤 Gastos", pesos(f["Total Gastos"]))
     c3, c4 = st.columns(2)
-    c3.metric("💵 Disponible", pesos(f["Total Disp"]))
+    c3.metric("📈 Ganancia estimada", pesos(f["Ganancia Est"]))
     c4.metric("⚖️ Diferencia", pesos(f["Diferencia"]))
 
     ing, _, _ = est.grupos_columnas(df)
@@ -107,25 +108,26 @@ def _tab_mes(df):
     d = df[df["AñoMes"] == mes]
     r = est.resumen_periodo(d)
 
-    st.metric("🏆 Ganancia neta del mes", pesos(r["ganancia"]))
-    c1, c2 = st.columns(2)
-    c1.metric("📥 Ingresos", pesos(r["ingresos"]))
-    c2.metric("📤 Gastos", pesos(r["gastos"]))
+    # Cifra principal: el dinero disponible del mes
+    st.metric("💵 Total disponible del mes", pesos(r["disponible"]))
     c3, c4 = st.columns(2)
     c3.metric("🚗 Días trabajados", r["dias_trabajados"])
-    c4.metric("📊 Promedio por día trabajado", pesos(r["promedio_dia"]))
+    c4.metric("📊 Promedio disponible por día trabajado", pesos(r["promedio_dia"]))
 
     if r["mejor_dia"]:
         c5, c6 = st.columns(2)
         c5.metric(f"⭐ Mejor día ({r['mejor_dia'][0]:%d/%m})", pesos(r["mejor_dia"][1]))
         c6.metric(f"⚠️ Peor día ({r['peor_dia'][0]:%d/%m})", pesos(r["peor_dia"][1]))
 
+    c1, c2 = st.columns(2)
+    c1.metric("📥 Ingresos", pesos(r["ingresos"]))
+    c2.metric("📤 Gastos", pesos(r["gastos"]))
     c7, c8 = st.columns(2)
-    c7.metric("💵 Total disponible", pesos(r["disponible"]))
+    c7.metric("📈 Ganancia estimada", pesos(r["ganancia"]))
     c8.metric("⚖️ Diferencia", pesos(r["diferencia"]))
 
-    st.markdown("##### Ganancia por día")
-    por_dia = d.set_index(d["Fecha"].dt.strftime("%d"))["Ganancia Est"]
+    st.markdown("##### Disponible por día")
+    por_dia = d.set_index(d["Fecha"].dt.strftime("%d"))["Total Disp"]
     _barras(por_dia)
 
     st.markdown("##### Ingresos por plataforma")
@@ -144,38 +146,45 @@ def _tab_anio(df):
     r = est.resumen_periodo(d)
     por_mes = est.resumen_por_mes(d)
 
-    st.metric("🏆 Ganancia neta del año", pesos(r["ganancia"]))
-    c1, c2 = st.columns(2)
-    c1.metric("📥 Ingresos", pesos(r["ingresos"]))
-    c2.metric("📤 Gastos", pesos(r["gastos"]))
+    # Cifra principal: el dinero disponible del año
+    st.metric("💵 Total disponible del año", pesos(r["disponible"]))
     c3, c4 = st.columns(2)
     c3.metric("🚗 Días trabajados", r["dias_trabajados"])
-    c4.metric("📊 Promedio por día trabajado", pesos(r["promedio_dia"]))
+    c4.metric("📊 Promedio disponible por día trabajado", pesos(r["promedio_dia"]))
 
     con_dias = por_mes[por_mes["Dias"] > 0]
     if not con_dias.empty:
-        mejor = con_dias["Ganancia"].idxmax()
-        peor = con_dias["Ganancia"].idxmin()
+        mejor = con_dias["Disponible"].idxmax()
+        peor = con_dias["Disponible"].idxmin()
         c5, c6 = st.columns(2)
-        c5.metric(f"⭐ Mejor mes ({nombre_mes(mejor).split()[0]})", pesos(con_dias.loc[mejor, "Ganancia"]))
-        c6.metric(f"⚠️ Peor mes ({nombre_mes(peor).split()[0]})", pesos(con_dias.loc[peor, "Ganancia"]))
+        c5.metric(f"⭐ Mejor mes ({nombre_mes(mejor).split()[0]})", pesos(con_dias.loc[mejor, "Disponible"]))
+        c6.metric(f"⚠️ Peor mes ({nombre_mes(peor).split()[0]})", pesos(con_dias.loc[peor, "Disponible"]))
+
+    c1, c2 = st.columns(2)
+    c1.metric("📥 Ingresos", pesos(r["ingresos"]))
+    c2.metric("📤 Gastos", pesos(r["gastos"]))
+    c7, c8 = st.columns(2)
+    c7.metric("📈 Ganancia estimada", pesos(r["ganancia"]))
+    c8.metric("⚖️ Diferencia", pesos(r["diferencia"]))
 
     etiquetas = [MESES_CORTOS[int(m.split("-")[1]) - 1] for m in por_mes.index]
 
-    st.markdown("##### Ganancia por mes")
-    ganancia_mes = por_mes["Ganancia"].copy()
-    ganancia_mes.index = etiquetas
-    _barras(ganancia_mes)
+    st.markdown("##### Disponible por mes")
+    disponible_mes = por_mes["Disponible"].copy()
+    disponible_mes.index = etiquetas
+    _barras(disponible_mes)
 
-    st.markdown("##### Ganancia acumulada")
-    _linea(ganancia_mes.cumsum())
+    st.markdown("##### Disponible acumulado")
+    _linea(disponible_mes.cumsum())
 
     st.markdown("##### Detalle por mes")
-    tabla = por_mes.copy()
+    tabla = por_mes[["Disponible", "Dias", "Promedio", "Ingresos", "Gastos", "Ganancia"]].copy()
     tabla.index = [nombre_mes(m).split()[0] for m in por_mes.index]
-    for col in ["Ingresos", "Gastos", "Ganancia", "Promedio"]:
+    for col in ["Disponible", "Promedio", "Ingresos", "Gastos", "Ganancia"]:
         tabla[col] = tabla[col].map(pesos)
-    tabla = tabla.rename(columns={"Dias": "Días", "Promedio": "Promedio/día"})
+    tabla = tabla.rename(columns={
+        "Dias": "Días", "Promedio": "Promedio/día", "Ganancia": "Ganancia est.",
+    })
     st.dataframe(tabla, width="stretch")
 
     st.markdown("##### Ingresos por plataforma")
