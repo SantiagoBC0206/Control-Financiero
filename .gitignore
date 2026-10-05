@@ -1,0 +1,18 @@
+# Base de datos con información real (nunca se sube a GitHub)
+*.db
+*.sqlite
+*.sqlite3
+
+# Contraseñas y secretos de Streamlit
+.streamlit/secrets.toml
+
+# Excel y CSV con datos reales
+*.xlsx
+*.xls
+*.csv
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+.venv/
+venv/
