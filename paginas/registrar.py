@@ -2,12 +2,10 @@
 paginas/registrar.py — Pantalla para registrar o editar un día (pensada para celular).
 """
 
-from datetime import date
-
 import streamlit as st
 
 import db
-from utilidades import pesos
+from utilidades import hoy, pesos
 
 # Valores que aparecen ya escritos cuando el día es NUEVO (puedes cambiarlos).
 VALORES_INICIALES_DIA_NUEVO = {"Gasolina": 60000}
@@ -51,7 +49,7 @@ def _mostrar_balance(fecha):
 
 def mostrar():
     st.subheader("➕ Registrar día")
-    fecha = st.date_input("Fecha", value=date.today(), format="DD/MM/YYYY")
+    fecha = st.date_input("Fecha", value=hoy(), format="DD/MM/YYYY")
 
     dia = db.cargar_dia(fecha)
     es_nuevo = dia is None

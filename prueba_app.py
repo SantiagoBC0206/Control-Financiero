@@ -28,6 +28,8 @@ assert any("incorrecta" in e.value for e in at.error), "debía rechazar la clave
 at.text_input[0].set_value("clave_de_prueba")
 at.button[0].click().run()
 assert not at.exception, at.exception
+assert at.subheader[0].value == "🏠 Inicio"  # con la base vacía, avisa que no hay datos
+at.radio[0].set_value("➕ Registrar día").run()
 assert at.subheader[0].value == "➕ Registrar día"
 
 # Registrar el 1 de agosto de 2025 igual que el Excel
