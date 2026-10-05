@@ -1,15 +1,15 @@
-"""paginas/registrar.py — Pantalla para registrar o editar un día (pensada para celular)."""
+"""paginas/registrar.py — Pantalla para consultar, registrar, editar y eliminar un día."""
 
 import streamlit as st
 import db
 from utilidades import hoy, pesos
 
-# Valores que aparecen ya escritos cuando el día es NUEVO (puedes cambiarlos).
+# Valores iniciales para días nuevos
 VALORES_INICIALES_DIA_NUEVO = {"Gasolina": 60000}
 
 
 def _campos(grupo, titulo, existentes, es_nuevo, fecha):
-  """Dibuja un campo numérico por cada nombre del grupo y devuelve los valores."""
+  """Dibuja campos numéricos para ingresar valores."""
   st.markdown(titulo)
   valores = {}
   columnas = st.columns(2)
@@ -25,25 +25,27 @@ def _campos(grupo, titulo, existentes, es_nuevo, fecha):
           value=inicial,
           placeholder="0",
           format="%d",
-          # la fecha en la clave hace que los campos se recarguen al cambiar de día
           key=f"{grupo}_{nombre}_{fecha}",
       )
   return valores
 
 
 def _mostrar_balance(fecha):
-  """Muestra el balance del día recién guardado dando énfasis al Total Disponible."""
-  fila = db.resumen_dias(desde=fecha, hasta=fecha).iloc[0]
+  """Muestra el resumen y cuadre de caja del día consultado/guardado."""
+  df_res = db.resumen_dias(desde=fecha, hasta=fecha)
+  if df_res.empty:
+    st.warning("No hay registros detallados para este día.")
+    return
 
-  st.success(f"✅ Día {fecha.strftime('%d/%m/%Y')} guardado")
+  fila = df_res.iloc[0]
 
   st.markdown("---")
   st.markdown("### 💰 CUADRE DE CAJA Y DINERO DISPONIBLE")
 
   # 1. Énfasis principal en Total Disponible
-  st.metric("💵 TOTAL DISPONIBLE EN CAJA", pesos(fila["Total Disp"]))
+  st.metric("💵 TOTAL DISPONIBLE EN CAJA", pesos(fila.get("Total Disp", 0)))
 
-  # 2. Desglose detallado de Efectivo vs Nequi / Bancos
+  # 2. Desglose detallado Efectivo vs Nequi
   dia = db.cargar_dia(fecha)
   movs = dia.get("movimientos", {}) if dia else {}
   val_efectivo = movs.get("Efectivo", 0) or 0
@@ -61,19 +63,23 @@ def _mostrar_balance(fecha):
   st.markdown("---")
   st.markdown("##### 📊 Resumen Financiero Adicional")
 
-  # 3. Datos secundarios (Ganancia, Ingresos, Gastos y Diferencia)
+  # 3. Métricas secundarias
   c1, c2 = st.columns(2)
-  c1.metric("📥 Total Ingresos", pesos(fila["Total Ingresos"]))
-  c2.metric("📤 Total Gastos", pesos(fila["Total Gastos"]))
+  c1.metric("📥 Total Ingresos", pesos(fila.get("Total Ingresos", 0)))
+  c2.metric("📤 Total Gastos", pesos(fila.get("Total Gastos", 0)))
 
   c3, c4 = st.columns(2)
-  c3.metric("📈 Ganancia Estimada", pesos(fila["Ganancia Est"]))
-  c4.metric("⚖️ Diferencia de Caja", pesos(fila["Diferencia"]))
+  c3.metric("📈 Ganancia Estimada", pesos(fila.get("Ganancia Est", 0)))
+  c4.metric("⚖️ Diferencia de Caja", pesos(fila.get("Diferencia", 0)))
+
+  obs = dia.get("observaciones", "") if dia else ""
+  if obs:
+    st.info(f"📝 **Observaciones:** {obs}")
 
 
 def mostrar():
-  st.subheader("➕ Registrar o Editar Día")
-  fecha = st.date_input("Fecha de trabajo", value=hoy(), format="DD/MM/YYYY")
+  st.subheader("📱 Gestión Diaria de Trabajo")
+  fecha = st.date_input("Selecciona la Fecha", value=hoy(), format="DD/MM/YYYY")
 
   dia = db.cargar_dia(fecha)
   es_nuevo = dia is None
@@ -83,37 +89,98 @@ def mostrar():
       "movimientos": {},
       "observaciones": "",
   }
+
   if not es_nuevo:
-    st.info(
-        f"ℹ️ El día **{fecha.strftime('%d/%m/%Y')}** ya tiene datos. Si"
-        " guardas, los datos anteriores se actualizarán."
+    st.success(f"📅 Registros encontrados para el día **{fecha.strftime('%d/%m/%Y')}**")
+
+    # Pestañas para elegir la acción deseada
+    tab_ver, tab_editar, tab_eliminar = st.tabs(
+        ["👁️ Visualizar", "✏️ Editar Día", "🗑️ Eliminar Día"]
     )
 
-  with st.form("form_dia"):
-    ingresos = _campos(
-        "ingresos", "### 📥 Ingresos", existentes["ingresos"], es_nuevo, fecha
-    )
-    gastos = _campos(
-        "gastos", "### 📤 Gastos", existentes["gastos"], es_nuevo, fecha
-    )
-    movimientos = _campos(
-        "movimientos",
-        "### 💳 Dinero recibido",
-        existentes["movimientos"],
-        es_nuevo,
-        fecha,
-    )
-    observaciones = st.text_input(
-        "Observaciones (opcional)",
-        value=existentes["observaciones"],
-        key=f"obs_{fecha}",
-    )
+    with tab_ver:
+      _mostrar_balance(fecha)
 
-    btn_label = "🔄 ACTUALIZAR DÍA" if not es_nuevo else "💾 GUARDAR DÍA"
-    guardar = st.form_submit_button(
-        btn_label, use_container_width=True, type="primary"
-    )
+    with tab_editar:
+      with st.form("form_editar_dia"):
+        ingresos = _campos(
+            "ingresos",
+            "### 📥 Ingresos",
+            existentes["ingresos"],
+            False,
+            fecha,
+        )
+        gastos = _campos(
+            "gastos", "### 📤 Gastos", existentes["gastos"], False, fecha
+        )
+        movimientos = _campos(
+            "movimientos",
+            "### 💳 Dinero recibido",
+            existentes["movimientos"],
+            False,
+            fecha,
+        )
+        observaciones = st.text_input(
+            "Observaciones (opcional)",
+            value=existentes["observaciones"],
+            key=f"obs_edit_{fecha}",
+        )
 
-  if guardar:
-    db.guardar_dia(fecha, ingresos, gastos, movimientos, observaciones)
-    _mostrar_balance(fecha)
+        guardar_edit = st.form_submit_button(
+            "🔄 ACTUALIZAR DÍA", use_container_width=True, type="primary"
+        )
+
+      if guardar_edit:
+        db.guardar_dia(fecha, ingresos, gastos, movimientos, observaciones)
+        st.success(f"✅ ¡Día {fecha.strftime('%d/%m/%Y')} actualizado!")
+        st.rerun()
+
+    with tab_eliminar:
+      st.error(
+          "⚠️ **Atención:** Esta acción eliminará permanentemente todos los"
+          " registros de este día."
+      )
+      confirmar_borrado = st.checkbox(
+          "Confirmo que deseo borrar este día de la base de datos."
+      )
+
+      if st.button(
+          "🗑️ ELIMINAR DÍA DEFINITIVAMENTE",
+          type="primary",
+          disabled=not confirmar_borrado,
+          use_container_width=True,
+      ):
+        db.eliminar_dia(fecha)
+        st.success(f"🗑️ Registro del {fecha.strftime('%d/%m/%Y')} eliminado.")
+        st.rerun()
+
+  else:
+    st.info(f"📝 Registrando nuevo día de trabajo: **{fecha.strftime('%d/%m/%Y')}**")
+    with st.form("form_nuevo_dia"):
+      ingresos = _campos(
+          "ingresos", "### 📥 Ingresos", existentes["ingresos"], True, fecha
+      )
+      gastos = _campos(
+          "gastos", "### 📤 Gastos", existentes["gastos"], True, fecha
+      )
+      movimientos = _campos(
+          "movimientos",
+          "### 💳 Dinero recibido",
+          existentes["movimientos"],
+          True,
+          fecha,
+      )
+      observaciones = st.text_input(
+          "Observaciones (opcional)",
+          value=existentes["observaciones"],
+          key=f"obs_new_{fecha}",
+      )
+
+      guardar_nuevo = st.form_submit_button(
+          "💾 GUARDAR DÍA", use_container_width=True, type="primary"
+      )
+
+    if guardar_nuevo:
+      db.guardar_dia(fecha, ingresos, gastos, movimientos, observaciones)
+      st.success(f"✅ ¡Día {fecha.strftime('%d/%m/%Y')} guardado exitosamente!")
+      st.rerun()
