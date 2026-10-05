@@ -1,0 +1,15 @@
+[theme]
+# Color principal (Botones, pestañas activas y acentos visuales) - Azul Rey
+primaryColor = "#1E88E5"
+
+# Color de fondo principal de la aplicación - Blanco puro
+backgroundColor = "#FFFFFF"
+
+# Color de fondo secundario (Barra lateral, cajas de texto y tarjetas) - Gris muy suave
+secondaryBackgroundColor = "#F0F2F6"
+
+# Color del texto - Gris oscuro/Negro para máximo contraste
+textColor = "#262730"
+
+# Tipo de fuente (moderna y limpia)
+font = "sans serif"
