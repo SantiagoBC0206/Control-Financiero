@@ -42,7 +42,7 @@ def verificar_password():
           label_visibility="collapsed",
       )
       ingresar = st.form_submit_button(
-          "🔑 INGRESAR AL SYSTEMA", use_container_width=True, type="primary"
+          "🔑 INGRESAR AL SISTEMA", use_container_width=True, type="primary"
       )
 
     if ingresar:
