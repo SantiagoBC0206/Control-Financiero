@@ -1,209 +1,170 @@
-"""
-paginas/inicio.py — Pantalla de inicio: balance de hoy, del mes y del año.
-"""
+"""paginas/inicio.py — Dashboard principal con gráficos interactivos tipo Power BI."""
 
-import altair as alt
+from datetime import datetime
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
-
 import db
-import estadisticas as est
-from utilidades import MESES_CORTOS, hoy, nombre_mes, pesos
+from utilidades import pesos
 
 
-# ---------------------------------------------------------------------------
-# Gráficas sencillas (Altair) que respetan el orden de los datos
-# ---------------------------------------------------------------------------
-def _barras(serie, ordenar=None):
-    """Gráfica de barras de una Serie (índice = nombre, valor = pesos)."""
-    datos = serie.reset_index()
-    datos.columns = ["Nombre", "Valor"]
-    grafica = (
-        alt.Chart(datos, height=220)
-        .mark_bar()
-        .encode(
-            x=alt.X("Nombre:N", sort=ordenar, title=None, axis=alt.Axis(labelAngle=0)),
-            y=alt.Y("Valor:Q", title=None),
-            tooltip=["Nombre", "Valor"],
-        )
-    )
-    st.altair_chart(grafica)
-
-
-def _linea(serie):
-    """Gráfica de línea con puntos de una Serie (para acumulados)."""
-    datos = serie.reset_index()
-    datos.columns = ["Nombre", "Valor"]
-    grafica = (
-        alt.Chart(datos, height=220)
-        .mark_line(point=True)
-        .encode(
-            x=alt.X("Nombre:N", sort=None, title=None, axis=alt.Axis(labelAngle=0)),
-            y=alt.Y("Valor:Q", title=None),
-            tooltip=["Nombre", "Valor"],
-        )
-    )
-    st.altair_chart(grafica)
-
-
-def _delta(valor):
-    """Texto de variación con signo: +$5.000 / -$5.000 (None si es 0)."""
-    if valor == 0:
-        return None
-    return ("+" if valor > 0 else "") + pesos(valor)
-
-
-# ---------------------------------------------------------------------------
-# Pestaña HOY
-# ---------------------------------------------------------------------------
-def _tab_hoy(df):
-    fecha = hoy()
-    st.markdown(f"#### {fecha.strftime('%d/%m/%Y')}")
-
-    fila_hoy = df[df["Fecha"] == pd.Timestamp(fecha)]
-    anterior = est.dia_anterior_trabajado(df, fecha)
-
-    if fila_hoy.empty:
-        st.info("Hoy todavía no hay registro. Ve a ➕ Registrar día.")
-        if anterior is not None:
-            st.caption(
-                f"Último día trabajado: {anterior['Fecha']:%d/%m/%Y} — "
-                f"disponible {pesos(anterior['Total Disp'])}"
-            )
-        return
-
-    f = fila_hoy.iloc[0]
-    delta = None
-    if anterior is not None:
-        delta = _delta(int(f["Total Disp"] - anterior["Total Disp"]))
-    # Cifra principal: el dinero disponible
-    st.metric("💵 Disponible de hoy", pesos(f["Total Disp"]), delta=delta)
-    if anterior is not None:
-        st.caption(
-            f"Comparado con el último día trabajado ({anterior['Fecha']:%d/%m/%Y}): "
-            f"{pesos(anterior['Total Disp'])}"
-        )
-
-    c1, c2 = st.columns(2)
-    c1.metric("📥 Ingresos", pesos(f["Total Ingresos"]))
-    c2.metric("📤 Gastos", pesos(f["Total Gastos"]))
-    c3, c4 = st.columns(2)
-    c3.metric("📈 Ganancia estimada", pesos(f["Ganancia Est"]))
-    c4.metric("⚖️ Diferencia", pesos(f["Diferencia"]))
-
-    ing, _, _ = est.grupos_columnas(df)
-    por_plataforma = f[ing].astype(int)
-    if por_plataforma.sum() > 0:
-        mejor = por_plataforma.idxmax()
-        st.caption(f"Plataforma que más produjo hoy: **{mejor}** ({pesos(por_plataforma[mejor])})")
-        _barras(por_plataforma)
-
-
-# ---------------------------------------------------------------------------
-# Pestaña MES
-# ---------------------------------------------------------------------------
-def _tab_mes(df):
-    meses = sorted(df["AñoMes"].unique(), reverse=True)
-    mes = st.selectbox("Mes", meses, format_func=nombre_mes)
-    d = df[df["AñoMes"] == mes]
-    r = est.resumen_periodo(d)
-
-    # Cifra principal: el dinero disponible del mes
-    st.metric("💵 Total disponible del mes", pesos(r["disponible"]))
-    c3, c4 = st.columns(2)
-    c3.metric("🚗 Días trabajados", r["dias_trabajados"])
-    c4.metric("📊 Promedio disponible por día trabajado", pesos(r["promedio_dia"]))
-
-    if r["mejor_dia"]:
-        c5, c6 = st.columns(2)
-        c5.metric(f"⭐ Mejor día ({r['mejor_dia'][0]:%d/%m})", pesos(r["mejor_dia"][1]))
-        c6.metric(f"⚠️ Peor día ({r['peor_dia'][0]:%d/%m})", pesos(r["peor_dia"][1]))
-
-    c1, c2 = st.columns(2)
-    c1.metric("📥 Ingresos", pesos(r["ingresos"]))
-    c2.metric("📤 Gastos", pesos(r["gastos"]))
-    c7, c8 = st.columns(2)
-    c7.metric("📈 Ganancia estimada", pesos(r["ganancia"]))
-    c8.metric("⚖️ Diferencia", pesos(r["diferencia"]))
-
-    st.markdown("##### Disponible por día")
-    por_dia = d.set_index(d["Fecha"].dt.strftime("%d"))["Total Disp"]
-    _barras(por_dia)
-
-    st.markdown("##### Ingresos por plataforma")
-    _barras(r["por_plataforma"], ordenar="-y")
-    st.markdown("##### Gastos por categoría")
-    _barras(r["por_categoria"], ordenar="-y")
-
-
-# ---------------------------------------------------------------------------
-# Pestaña AÑO
-# ---------------------------------------------------------------------------
-def _tab_anio(df):
-    anios = sorted(df["Fecha"].dt.year.unique(), reverse=True)
-    anio = st.selectbox("Año", [int(a) for a in anios])
-    d = df[df["Fecha"].dt.year == anio]
-    r = est.resumen_periodo(d)
-    por_mes = est.resumen_por_mes(d)
-
-    # Cifra principal: el dinero disponible del año
-    st.metric("💵 Total disponible del año", pesos(r["disponible"]))
-    c3, c4 = st.columns(2)
-    c3.metric("🚗 Días trabajados", r["dias_trabajados"])
-    c4.metric("📊 Promedio disponible por día trabajado", pesos(r["promedio_dia"]))
-
-    con_dias = por_mes[por_mes["Dias"] > 0]
-    if not con_dias.empty:
-        mejor = con_dias["Disponible"].idxmax()
-        peor = con_dias["Disponible"].idxmin()
-        c5, c6 = st.columns(2)
-        c5.metric(f"⭐ Mejor mes ({nombre_mes(mejor).split()[0]})", pesos(con_dias.loc[mejor, "Disponible"]))
-        c6.metric(f"⚠️ Peor mes ({nombre_mes(peor).split()[0]})", pesos(con_dias.loc[peor, "Disponible"]))
-
-    c1, c2 = st.columns(2)
-    c1.metric("📥 Ingresos", pesos(r["ingresos"]))
-    c2.metric("📤 Gastos", pesos(r["gastos"]))
-    c7, c8 = st.columns(2)
-    c7.metric("📈 Ganancia estimada", pesos(r["ganancia"]))
-    c8.metric("⚖️ Diferencia", pesos(r["diferencia"]))
-
-    etiquetas = [MESES_CORTOS[int(m.split("-")[1]) - 1] for m in por_mes.index]
-
-    st.markdown("##### Disponible por mes")
-    disponible_mes = por_mes["Disponible"].copy()
-    disponible_mes.index = etiquetas
-    _barras(disponible_mes)
-
-    st.markdown("##### Disponible acumulado")
-    _linea(disponible_mes.cumsum())
-
-    st.markdown("##### Detalle por mes")
-    tabla = por_mes[["Disponible", "Dias", "Promedio", "Ingresos", "Gastos", "Ganancia"]].copy()
-    tabla.index = [nombre_mes(m).split()[0] for m in por_mes.index]
-    for col in ["Disponible", "Promedio", "Ingresos", "Gastos", "Ganancia"]:
-        tabla[col] = tabla[col].map(pesos)
-    tabla = tabla.rename(columns={
-        "Dias": "Días", "Promedio": "Promedio/día", "Ganancia": "Ganancia est.",
-    })
-    st.dataframe(tabla, width="stretch")
-
-    st.markdown("##### Ingresos por plataforma")
-    _barras(r["por_plataforma"], ordenar="-y")
-
-
-# ---------------------------------------------------------------------------
 def mostrar():
-    st.subheader("🏠 Inicio")
-    resumen = db.resumen_dias()
-    if resumen.empty:
-        st.info("Aún no hay días registrados. Ve a ➕ Registrar día para empezar.")
-        return
+  st.subheader("📊 Dashboard Financiero")
 
-    df = est.preparar(resumen)
-    tab_hoy, tab_mes, tab_anio = st.tabs(["Hoy", "Mes", "Año"])
-    with tab_hoy:
-        _tab_hoy(df)
-    with tab_mes:
-        _tab_mes(df)
-    with tab_anio:
-        _tab_anio(df)
+  # Cargar datos del resumen
+  df = db.resumen_dias()
+
+  if df.empty:
+    st.info(
+        "👋 ¡Bienvenido! Aún no hay registros en el sistema. Ve a la sección **➕"
+        " Registrar día** para comenzar."
+    )
+    return
+
+  # Convertir la columna Fecha a datetime para agrupaciones
+  df["Fecha_dt"] = pd.to_datetime(df["Fecha"])
+  df["Año_Mes"] = df["Fecha_dt"].dt.strftime("%Y-%m")
+  df["Dia_Semana"] = df["Fecha_dt"].dt.day_name()
+
+  # Mapeo de días al español
+  dias_espanol = {
+      "Monday": "Lunes",
+      "Tuesday": "Martes",
+      "Wednesday": "Miércoles",
+      "Thursday": "Jueves",
+      "Friday": "Viernes",
+      "Saturday": "Sábado",
+      "Sunday": "Domingo",
+  }
+  df["Dia_Semana_ES"] = df["Dia_Semana"].map(dias_espanol)
+
+  # --- FILTRO POR MES ---
+  meses_disponibles = sorted(df["Año_Mes"].unique(), reverse=True)
+  mes_actual_str = datetime.now().strftime("%Y-%m")
+  default_index = (
+      meses_disponibles.index(mes_actual_str)
+      if mes_actual_str in meses_disponibles
+      else 0
+  )
+
+  mes_sel = st.selectbox(
+      "📅 Selecciona el Mes a Analizar",
+      meses_disponibles,
+      index=default_index,
+  )
+  df_mes = df[df["Año_Mes"] == mes_sel].copy()
+
+  if df_mes.empty:
+    st.warning("No hay datos para el mes seleccionado.")
+    return
+
+  # --- MÉTRICAS CLAVE (KPIs) ---
+  tot_ingresos = df_mes["Total Ingresos"].sum()
+  tot_gastos = df_mes["Total Gastos"].sum()
+  tot_ganancia = df_mes["Ganancia Est"].sum()
+  tot_disponible = df_mes["Total Disp"].sum()
+
+  st.markdown("---")
+  c1, c2 = st.columns(2)
+  c1.metric("💵 Total Disponible en Caja", pesos(tot_disponible))
+  c2.metric("📈 Ganancia Estimada", pesos(tot_ganancia))
+
+  c3, c4 = st.columns(2)
+  c3.metric("📥 Total Ingresos", pesos(tot_ingresos))
+  c4.metric("📤 Total Gastos", pesos(tot_gastos))
+
+  # --- INDICADOR: DÍA MÁS RENTABLE DE LA SEMANA ---
+  st.markdown("---")
+  st.markdown("### 🏆 Análisis de Rentabilidad por Día")
+
+  df_dias_rentables = (
+      df.groupby("Dia_Semana_ES")["Ganancia Est"]
+      .mean()
+      .reset_index()
+  )
+  orden_dias = [
+      "Lunes",
+      "Martes",
+      "Miércoles",
+      "Jueves",
+      "Viernes",
+      "Sábado",
+      "Domingo",
+  ]
+  df_dias_rentables["Dia_Semana_ES"] = pd.Categorical(
+      df_dias_rentables["Dia_Semana_ES"], categories=orden_dias, ordered=True
+  )
+  df_dias_rentables = df_dias_rentables.sort_values("Dia_Semana_ES")
+
+  if not df_dias_rentables.empty and df_dias_rentables["Ganancia Est"].max() > 0:
+    dia_top = df_dias_rentables.loc[
+        df_dias_rentables["Ganancia Est"].idxmax()
+    ]
+    st.success(
+        f"⭐ **Día más rentable históricamente:** **{dia_top['Dia_Semana_ES']}**"
+        f" con un promedio de **{pesos(dia_top['Ganancia Est'])}** por día."
+    )
+
+  # --- GRÁFICO 1: DONUT DE DISTRIBUCIÓN DE INGRESOS ---
+  st.markdown("---")
+  st.markdown(f"### 🍩 Distribución de Ingresos (`{mes_sel}`)")
+
+  col_plat = [
+      c
+      for c in ["Didi", "InDrive", "Uber", "Extras"]
+      if c in df_mes.columns and df_mes[c].sum() > 0
+  ]
+
+  if col_plat:
+    plat_totales = (
+        df_mes[col_plat].sum().reset_index()
+    )
+    plat_totales.columns = ["Plataforma", "Monto"]
+
+    fig_donut = px.pie(
+        plat_totales,
+        values="Monto",
+        names="Plataforma",
+        hole=0.5,
+        color_discrete_sequence=px.colors.qualitative.Set2,
+    )
+    fig_donut.update_traces(textposition="inside", textinfo="percent+label")
+    fig_donut.update_layout(
+        margin=dict(t=20, b=20, l=10, r=10),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.2),
+    )
+    st.plotly_chart(fig_donut, use_container_width=True)
+  else:
+    st.info("Sin datos de plataformas para graficar en este mes.")
+
+  # --- GRÁFICO 2: EVOLUCIÓN DIARIA INGRESOS VS GASTOS ---
+  st.markdown("---")
+  st.markdown(f"### 📉 Ingresos vs Gastos por Día (`{mes_sel}`)")
+
+  fig_barras = go.Figure()
+  fig_barras.add_trace(
+      go.Bar(
+          x=df_mes["Fecha"],
+          y=df_mes["Total Ingresos"],
+          name="Ingresos",
+          marker_color="#1E88E5",
+      )
+  )
+  fig_barras.add_trace(
+      go.Bar(
+          x=df_mes["Fecha"],
+          y=df_mes["Total Gastos"],
+          name="Gastos",
+          marker_color="#E53935",
+      )
+  )
+
+  fig_barras.update_layout(
+      barmode="group",
+      margin=dict(t=20, b=20, l=10, r=10),
+      legend=dict(orientation="h", yanchor="bottom", y=1.02),
+      xaxis_title="Día",
+      yaxis_title="Pesos ($)",
+  )
+  st.plotly_chart(fig_barras, use_container_width=True)
