@@ -1,9 +1,10 @@
-"""
-paginas/inicio.py — Dashboard principal con gráficos interactivos, filtros por fecha y exportación a Excel.
-"""
+"""paginas/inicio.py — Dashboard principal con gráficos interactivos y exportación profesional a Excel."""
 
-import io
 from datetime import datetime
+import io
+import openpyxl
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -13,10 +14,100 @@ from utilidades import pesos
 
 
 def convertir_df_a_excel(df):
-  """Genera un archivo Excel en memoria para descarga inmediata."""
+  """Genera un archivo Excel profesional con colores, bordes, totales y formato moneda."""
   output = io.BytesIO()
-  with pd.ExcelWriter(output, engine="openpyxl") as writer:
-    df.to_excel(writer, index=False, sheet_name="ControlFinanciero")
+  wb = openpyxl.Workbook()
+  ws = wb.active
+  ws.title = "Control Financiero"
+
+  ws.views.sheetView[0].showGridLines = True
+
+  df_export = df.drop(
+      columns=["Fecha_dt", "Año_Mes", "Dia_Semana", "Dia_Semana_ES"],
+      errors="ignore",
+  ).copy()
+
+  headers = list(df_export.columns)
+  ws.append(headers)
+
+  fill_header = PatternFill(
+      start_color="1E88E5", end_color="1E88E5", fill_type="solid"
+  )
+  font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+  align_center = Alignment(horizontal="center", vertical="center")
+  thin_border = Border(
+      left=Side(style="thin", color="CCCCCC"),
+      right=Side(style="thin", color="CCCCCC"),
+      top=Side(style="thin", color="CCCCCC"),
+      bottom=Side(style="thin", color="CCCCCC"),
+  )
+
+  for col_num, _ in enumerate(headers, 1):
+    cell = ws.cell(row=1, column=col_num)
+    cell.fill = fill_header
+    cell.font = font_header
+    cell.alignment = align_center
+    cell.border = thin_border
+
+  font_data = Font(name="Calibri", size=10)
+  cols_moneda = [c for c in headers if c not in ["Fecha", "Observaciones"]]
+
+  for _, row in df_export.iterrows():
+    row_data = [row[col] for col in headers]
+    ws.append(row_data)
+
+    current_row = ws.max_row
+    for col_idx, col_name in enumerate(headers, 1):
+      cell = ws.cell(row=current_row, column=col_idx)
+      cell.font = font_data
+      cell.border = thin_border
+
+      if col_name == "Fecha":
+        cell.alignment = Alignment(horizontal="center")
+      elif col_name in cols_moneda:
+        cell.number_format = '"$"#,##0'
+        cell.alignment = Alignment(horizontal="right")
+
+  totales_row = ["TOTALES"]
+  for col in headers[1:]:
+    if col in cols_moneda:
+      totales_row.append(df_export[col].sum())
+    else:
+      totales_row.append("")
+
+  ws.append(totales_row)
+  tot_row_idx = ws.max_row
+
+  fill_total = PatternFill(
+      start_color="E3F2FD", end_color="E3F2FD", fill_type="solid"
+  )
+  font_total = Font(name="Calibri", size=11, bold=True, color="0D47A1")
+
+  for col_idx, col_name in enumerate(headers, 1):
+    cell = ws.cell(row=tot_row_idx, column=col_idx)
+    cell.fill = fill_total
+    cell.font = font_total
+    cell.border = Border(
+        top=Side(style="medium", color="1E88E5"),
+        bottom=Side(style="double", color="1E88E5"),
+    )
+    if col_name in cols_moneda:
+      cell.number_format = '"$"#,##0'
+      cell.alignment = Alignment(horizontal="right")
+
+  for col in ws.columns:
+    max_len = 0
+    col_letter = get_column_letter(col[0].column)
+    for cell in col:
+      val_str = str(cell.value or "")
+      if cell.number_format == '"$"#,##0' and isinstance(
+          cell.value, (int, float)
+      ):
+        val_str = f"${cell.value:,.0f}"
+      max_len = max(max_len, len(val_str))
+    ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+  wb.save(output)
   return output.getvalue()
 
 
@@ -47,7 +138,6 @@ def mostrar():
   }
   df["Dia_Semana_ES"] = df["Dia_Semana"].map(dias_espanol)
 
-  # --- FILTROS AVANZADOS (MES O RANGO DE FECHAS) ---
   st.markdown("### 🔍 Filtro de Período")
   tipo_filtro = st.radio(
       "Tipo de Consulta",
@@ -91,19 +181,15 @@ def mostrar():
     st.warning("No se encontraron registros para el período seleccionado.")
     return
 
-  # --- BOTÓN DE EXPORTACIÓN A EXCEL ---
-  excel_data = convertir_df_a_excel(
-      df_filtrado.drop(columns=["Fecha_dt", "Año_Mes", "Dia_Semana_ES"], errors="ignore")
-  )
+  excel_data = convertir_df_a_excel(df_filtrado)
   st.download_button(
-      label=f"📥 Descargar Reporte en Excel ({titulo_periodo})",
+      label=f"📥 Descargar Reporte Excel ({titulo_periodo})",
       data=excel_data,
       file_name=f"Reporte_Control_Financiero_{titulo_periodo.replace(' ', '_')}.xlsx",
       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       use_container_width=True,
   )
 
-  # --- MÉTRICAS CLAVE (KPIs) ---
   tot_ingresos = df_filtrado["Total Ingresos"].sum()
   tot_gastos = df_filtrado["Total Gastos"].sum()
   tot_ganancia = df_filtrado["Ganancia Est"].sum()
@@ -118,7 +204,6 @@ def mostrar():
   c3.metric("📥 Total Ingresos", pesos(tot_ingresos))
   c4.metric("📤 Total Gastos", pesos(tot_gastos))
 
-  # --- INDICADOR: DÍA MÁS RENTABLE DEL PERÍODO ---
   st.markdown("---")
   st.markdown(f"### 🏆 Análisis de Rentabilidad ({titulo_periodo})")
 
@@ -149,7 +234,6 @@ def mostrar():
         f" **{pesos(dia_top['Total Disp'])}** disponibles por día."
     )
 
-  # --- GRÁFICO 1: DONUT DE DISTRIBUCIÓN DE INGRESOS ---
   st.markdown("---")
   st.markdown(f"### 🍩 Distribución de Ingresos ({titulo_periodo})")
 
@@ -179,7 +263,6 @@ def mostrar():
   else:
     st.info("Sin datos de plataformas para graficar en este período.")
 
-  # --- GRÁFICO 2: EVOLUCIÓN DIARIA INGRESOS VS GASTOS ---
   st.markdown("---")
   st.markdown(f"### 📉 Ingresos vs Gastos por Día ({titulo_periodo})")
 
