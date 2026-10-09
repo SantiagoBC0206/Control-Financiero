@@ -1,35 +1,28 @@
-"""
-db.py — Capa de base de datos del Control Financiero (SQLite).
+"""db.py — Capa de base de datos del Control Financiero (Soporta PostgreSQL/Supabase y SQLite).
 
 Aquí vive TODO lo que toca la base de datos. Las pantallas (Streamlit) solo
 llaman a estas funciones y nunca escriben SQL directamente.
 
-Diseño (una fila por dato, no una fila gigante por día):
+Diseño relacional flexible:
     dias_trabajo : un registro por fecha (+ observaciones)
     ingresos     : valor por plataforma y día   (Didi, InDrive, Uber, Extras, ...)
     gastos       : valor por categoría y día    (Gasolina, Apps, Comida, ...)
     movimientos  : valor por método y día       (Efectivo, Nequi, ...)
-
-Para agregar una plataforma o categoría nueva NO hay que cambiar la base de
-datos: basta con guardar un valor con ese nombre.
 """
 
-import os
-import sqlite3
 from contextlib import contextmanager
-
+import sqlite3
 import pandas as pd
+import streamlit as st
 
-# Ruta de la base de datos. Se puede cambiar con la variable de entorno RUTA_DB
-# (útil para pruebas y para el despliegue).
-RUTA_DB = os.environ.get("RUTA_DB", "transporte.db")
+# Obtener la URL de conexión a PostgreSQL desde st.secrets
+DATABASE_URL = st.secrets.get("DATABASE_URL", None)
 
-# Nombres iguales a las columnas del Excel para que todo coincida.
+# Nombres iguales a las columnas del Excel para mantener compatibilidad
 PLATAFORMAS_BASE = ["Didi", "InDrive", "Uber", "Extras"]
 CATEGORIAS_BASE = ["Gasolina", "Apps", "Comida", "Otros Gastos"]
 METODOS_BASE = ["Efectivo", "Nequi"]
 
-# grupo -> (nombre de la columna en la tabla, nombres base)
 GRUPOS = {
     "ingresos": ("plataforma", PLATAFORMAS_BASE),
     "gastos": ("categoria", CATEGORIAS_BASE),
@@ -38,67 +31,100 @@ GRUPOS = {
 
 
 # ---------------------------------------------------------------------------
-# Conexión
+# Conexión adaptativa (PostgreSQL o SQLite)
 # ---------------------------------------------------------------------------
 @contextmanager
 def _conexion():
-    """Abre la base, confirma los cambios al terminar y la cierra siempre."""
-    conn = sqlite3.connect(RUTA_DB)
-    conn.execute("PRAGMA foreign_keys = ON")  # necesario para ON DELETE CASCADE
+  """Abre la base de datos, maneja la transacción y la cierra automáticamente."""
+  usando_postgres = False
+  if DATABASE_URL:
     try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()  # si algo falla, no queda nada a medias
-        raise
-    finally:
-        conn.close()
+      import psycopg2
+
+      conn = psycopg2.connect(DATABASE_URL)
+      usando_postgres = True
+    except Exception as e:
+      st.warning(f"No se pudo conectar a Supabase/PostgreSQL, usando SQLite: {e}")
+      conn = sqlite3.connect("transporte.db")
+      conn.execute("PRAGMA foreign_keys = ON")
+  else:
+    conn = sqlite3.connect("transporte.db")
+    conn.execute("PRAGMA foreign_keys = ON")
+
+  try:
+    yield conn
+    conn.commit()
+  except Exception:
+    conn.rollback()
+    raise
+  finally:
+    conn.close()
+
+
+def _placeholder(conn):
+  """Retorna el marcador de posición correcto según la base de datos usada."""
+  # %s para PostgreSQL (psycopg2), ? para SQLite
+  return "%s" if type(conn).__module__.startswith("psycopg2") else "?"
 
 
 def _entero(valor):
-    """Convierte cualquier valor a pesos enteros. Vacío o inválido = 0."""
-    try:
-        if valor is None or pd.isna(valor):
-            return 0
-        return int(round(float(valor)))
-    except (TypeError, ValueError):
-        return 0
+  """Convierte cualquier valor a pesos enteros. Vacío o inválido = 0."""
+  try:
+    if valor is None or pd.isna(valor):
+      return 0
+    return int(round(float(valor)))
+  except (TypeError, ValueError):
+    return 0
 
 
 # ---------------------------------------------------------------------------
 # Creación de tablas
 # ---------------------------------------------------------------------------
 def init_db():
-    """Crea las tablas nuevas si no existen. No toca la tabla vieja 'registros'."""
-    with _conexion() as conn:
-        conn.executescript("""
+  """Crea las tablas relacionales en Supabase/PostgreSQL o SQLite."""
+  with _conexion() as conn:
+    cursor = conn.cursor()
+
+    # Tipos de datos compatibles según el motor
+    if type(conn).__module__.startswith("psycopg2"):
+      pk_type = "SERIAL PRIMARY KEY"
+    else:
+      pk_type = "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+    cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS dias_trabajo (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                fecha         TEXT NOT NULL UNIQUE,      -- formato AAAA-MM-DD
+                id {pk_type},
+                fecha TEXT NOT NULL UNIQUE,
                 observaciones TEXT NOT NULL DEFAULT ''
             );
+        """)
 
+    cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS ingresos (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                dia_id     INTEGER NOT NULL REFERENCES dias_trabajo(id) ON DELETE CASCADE,
+                id {pk_type},
+                dia_id INTEGER NOT NULL REFERENCES dias_trabajo(id) ON DELETE CASCADE,
                 plataforma TEXT NOT NULL,
-                valor      INTEGER NOT NULL,
+                valor INTEGER NOT NULL,
                 UNIQUE (dia_id, plataforma)
             );
+        """)
 
+    cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS gastos (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                dia_id    INTEGER NOT NULL REFERENCES dias_trabajo(id) ON DELETE CASCADE,
+                id {pk_type},
+                dia_id INTEGER NOT NULL REFERENCES dias_trabajo(id) ON DELETE CASCADE,
                 categoria TEXT NOT NULL,
-                valor     INTEGER NOT NULL,
+                valor INTEGER NOT NULL,
                 UNIQUE (dia_id, categoria)
             );
+        """)
 
+    cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS movimientos (
-                id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {pk_type},
                 dia_id INTEGER NOT NULL REFERENCES dias_trabajo(id) ON DELETE CASCADE,
                 metodo TEXT NOT NULL,
-                valor  INTEGER NOT NULL,
+                valor INTEGER NOT NULL,
                 UNIQUE (dia_id, metodo)
             );
         """)
@@ -108,206 +134,194 @@ def init_db():
 # Guardar y leer un día
 # ---------------------------------------------------------------------------
 def _guardar_dia_en(conn, fecha, ingresos, gastos, movimientos, observaciones):
-    """Guarda un día completo dentro de una conexión ya abierta.
+  """Guarda un día dentro de una conexión abierta."""
+  p = _placeholder(conn)
+  cursor = conn.cursor()
+  fecha = str(fecha)
 
-    Si la fecha ya existe, REEMPLAZA sus valores (así editar un día o subir el
-    mismo Excel dos veces no duplica nada). Los valores en 0 no se guardan.
-    """
-    fecha = str(fecha)
-    conn.execute(
-        """
-        INSERT INTO dias_trabajo (fecha, observaciones) VALUES (?, ?)
-        ON CONFLICT(fecha) DO UPDATE SET observaciones = excluded.observaciones
+  # Insertar o actualizar observaciones del día
+  if type(conn).__module__.startswith("psycopg2"):
+    cursor.execute(
+        f"""
+            INSERT INTO dias_trabajo (fecha, observaciones) VALUES ({p}, {p})
+            ON CONFLICT(fecha) DO UPDATE SET observaciones = EXCLUDED.observaciones
         """,
         (fecha, observaciones or ""),
     )
-    dia_id = conn.execute(
-        "SELECT id FROM dias_trabajo WHERE fecha = ?", (fecha,)
-    ).fetchone()[0]
+  else:
+    cursor.execute(
+        f"""
+            INSERT INTO dias_trabajo (fecha, observaciones) VALUES ({p}, {p})
+            ON CONFLICT(fecha) DO UPDATE SET observaciones = excluded.observaciones
+        """,
+        (fecha, observaciones or ""),
+    )
 
-    for grupo, valores in (
-        ("ingresos", ingresos),
-        ("gastos", gastos),
-        ("movimientos", movimientos),
-    ):
-        columna = GRUPOS[grupo][0]
-        conn.execute(f"DELETE FROM {grupo} WHERE dia_id = ?", (dia_id,))
-        for nombre, valor in (valores or {}).items():
-            v = _entero(valor)
-            if v != 0:
-                conn.execute(
-                    f"INSERT INTO {grupo} (dia_id, {columna}, valor) VALUES (?, ?, ?)",
-                    (dia_id, str(nombre).strip(), v),
-                )
+  cursor.execute(
+      f"SELECT id FROM dias_trabajo WHERE fecha = {p}", (fecha,)
+  )
+  dia_id = cursor.fetchone()[0]
+
+  for grupo, valores in (
+      ("ingresos", ingresos),
+      ("gastos", gastos),
+      ("movimientos", movimientos),
+  ):
+    columna = GRUPOS[grupo][0]
+    cursor.execute(
+        f"DELETE FROM {grupo} WHERE dia_id = {p}", (dia_id,)
+    )
+
+    for nombre, valor in (valores or {}).items():
+      v = _entero(valor)
+      if v != 0:
+        cursor.execute(
+            f"INSERT INTO {grupo} (dia_id, {columna}, valor) VALUES ({p},"
+            f" {p}, {p})",
+            (dia_id, str(nombre).strip(), v),
+        )
 
 
 def guardar_dia(fecha, ingresos, gastos, movimientos, observaciones=""):
-    """Guarda (o reemplaza) un día.
-
-    Ejemplo:
-        guardar_dia("2025-08-01",
-                    ingresos={"InDrive": 42439, "Uber": 33093, "Extras": 12000},
-                    gastos={"Gasolina": 60000, "Apps": 17000},
-                    movimientos={"Efectivo": 16000, "Nequi": 98400})
-    """
-    with _conexion() as conn:
-        _guardar_dia_en(conn, fecha, ingresos, gastos, movimientos, observaciones)
+  """Guarda o reemplaza un día completo."""
+  with _conexion() as conn:
+    _guardar_dia_en(
+        conn, fecha, ingresos, gastos, movimientos, observaciones
+    )
 
 
 def guardar_varios_dias(dias):
-    """Guarda muchos días de una vez (todo o nada: si uno falla, no se guarda ninguno).
-
-    'dias' es una lista de diccionarios con: fecha, ingresos, gastos,
-    movimientos y (opcional) observaciones.
-    """
-    with _conexion() as conn:
-        for d in dias:
-            _guardar_dia_en(
-                conn, d["fecha"], d["ingresos"], d["gastos"], d["movimientos"],
-                d.get("observaciones", ""),
-            )
+  """Guarda una lista de días en una sola transacción."""
+  with _conexion() as conn:
+    for d in dias:
+      _guardar_dia_en(
+          conn,
+          d["fecha"],
+          d["ingresos"],
+          d["gastos"],
+          d["movimientos"],
+          d.get("observaciones", ""),
+      )
 
 
 def cargar_dia(fecha):
-    """Devuelve un diccionario con el día, o None si no existe."""
-    with _conexion() as conn:
-        dia = conn.execute(
-            "SELECT id, observaciones FROM dias_trabajo WHERE fecha = ?",
-            (str(fecha),),
-        ).fetchone()
-        if dia is None:
-            return None
-        resultado = {"fecha": str(fecha), "observaciones": dia[1]}
-        for grupo, (columna, _) in GRUPOS.items():
-            filas = conn.execute(
-                f"SELECT {columna}, valor FROM {grupo} WHERE dia_id = ?", (dia[0],)
-            ).fetchall()
-            resultado[grupo] = {nombre: valor for nombre, valor in filas}
-        return resultado
+  """Devuelve un diccionario con los datos del día o None si no existe."""
+  with _conexion() as conn:
+    p = _placeholder(conn)
+    cursor = conn.cursor()
+    cursor.execute(
+        f"SELECT id, observaciones FROM dias_trabajo WHERE fecha = {p}",
+        (str(fecha),),
+    )
+    dia = cursor.fetchone()
+    if dia is None:
+      return None
+
+    resultado = {"fecha": str(fecha), "observaciones": dia[1]}
+    for grupo, (columna, _) in GRUPOS.items():
+      cursor.execute(
+          f"SELECT {columna}, valor FROM {grupo} WHERE dia_id = {p}",
+          (dia[0],),
+      )
+      filas = cursor.fetchall()
+      resultado[grupo] = {nombre: valor for nombre, valor in filas}
+    return resultado
 
 
 def eliminar_dia(fecha):
-    """Borra un día y todos sus valores (ON DELETE CASCADE)."""
-    with _conexion() as conn:
-        conn.execute("DELETE FROM dias_trabajo WHERE fecha = ?", (str(fecha),))
+  """Borra un día y todos sus registros asociados."""
+  with _conexion() as conn:
+    p = _placeholder(conn)
+    conn.cursor().execute(
+        f"DELETE FROM dias_trabajo WHERE fecha = {p}", (str(fecha),)
+    )
 
 
 def nombres_disponibles(grupo):
-    """Nombres base + los que se hayan agregado después (para armar el formulario)."""
-    columna, base = GRUPOS[grupo]
-    with _conexion() as conn:
-        filas = conn.execute(
-            f"SELECT DISTINCT {columna} FROM {grupo} ORDER BY {columna}"
-        ).fetchall()
-    return base + sorted(f[0] for f in filas if f[0] not in base)
+  """Devuelve plataformas, categorías o métodos disponibles."""
+  columna, base = GRUPOS[grupo]
+  with _conexion() as conn:
+    cursor = conn.cursor()
+    cursor.execute(
+        f"SELECT DISTINCT {columna} FROM {grupo} ORDER BY {columna}"
+    )
+    filas = cursor.fetchall()
+  return base + sorted(f[0] for f in filas if f[0] not in base)
 
 
 # ---------------------------------------------------------------------------
-# Resumen: una fila por día, con el mismo formato del Excel
+# Resumen general para la aplicación
 # ---------------------------------------------------------------------------
 def resumen_dias(desde=None, hasta=None):
-    """Devuelve un DataFrame con una fila por día y las mismas columnas del Excel.
+  """Devuelve un DataFrame estructurado con todas las métricas calculadas."""
+  filtros, params = [], []
+  if desde:
+    filtros.append("d.fecha >= " + ("%s" if DATABASE_URL else "?"))
+    params.append(str(desde))
+  if hasta:
+    filtros.append("d.fecha <= " + ("%s" if DATABASE_URL else "?"))
+    params.append(str(hasta))
 
-    Columnas: Fecha, <plataformas>, Total Ingresos, <gastos>, Total Gastos,
-    Ganancia Est, <métodos>, Total Disp, Diferencia, Observaciones.
+  where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
 
-    Diferencia = Ganancia Est - Total Disp (misma fórmula del Excel).
-    'desde' y 'hasta' son fechas opcionales (inclusive).
-    """
-    filtros, params = [], []
-    if desde:
-        filtros.append("d.fecha >= ?")
-        params.append(str(desde))
-    if hasta:
-        filtros.append("d.fecha <= ?")
-        params.append(str(hasta))
-    where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
-
-    with _conexion() as conn:
-        dias = pd.read_sql_query(
-            f"SELECT d.fecha AS Fecha, d.observaciones AS Observaciones "
-            f"FROM dias_trabajo d {where} ORDER BY d.fecha",
-            conn,
-            params=params,
-        )
-        anchos = {}
-        for grupo, (columna, base) in GRUPOS.items():
-            largo = pd.read_sql_query(
-                f"SELECT d.fecha AS Fecha, t.{columna} AS nombre, t.valor "
-                f"FROM {grupo} t JOIN dias_trabajo d ON d.id = t.dia_id {where}",
-                conn,
-                params=params,
-            )
-            ancho = largo.pivot_table(
-                index="Fecha", columns="nombre", values="valor", aggfunc="sum"
-            )
-            nuevos = sorted(c for c in ancho.columns if c not in base)
-            anchos[grupo] = ancho.reindex(columns=base + nuevos)
-
-    resumen = dias.set_index("Fecha")
-    observaciones = resumen.pop("Observaciones")
-    for grupo in GRUPOS:
-        resumen = resumen.join(anchos[grupo])
-    resumen = resumen.fillna(0).astype(int)
-
-    cols_ing = list(anchos["ingresos"].columns)
-    cols_gas = list(anchos["gastos"].columns)
-    cols_mov = list(anchos["movimientos"].columns)
-
-    resumen["Total Ingresos"] = resumen[cols_ing].sum(axis=1)
-    resumen["Total Gastos"] = resumen[cols_gas].sum(axis=1)
-    resumen["Ganancia Est"] = resumen["Total Ingresos"] - resumen["Total Gastos"]
-    resumen["Total Disp"] = resumen[cols_mov].sum(axis=1)
-    resumen["Diferencia"] = resumen["Ganancia Est"] - resumen["Total Disp"]
-    resumen["Observaciones"] = observaciones
-
-    orden = (
-        cols_ing + ["Total Ingresos"]
-        + cols_gas + ["Total Gastos", "Ganancia Est"]
-        + cols_mov + ["Total Disp", "Diferencia", "Observaciones"]
+  with _conexion() as conn:
+    dias = pd.read_sql_query(
+        f"SELECT d.fecha AS Fecha, d.observaciones AS Observaciones "
+        f"FROM dias_trabajo d {where} ORDER BY d.fecha DESC",
+        conn,
+        params=params,
     )
-    return resumen[orden].reset_index()
 
+    if dias.empty:
+      return pd.DataFrame()
 
-# ---------------------------------------------------------------------------
-# Migración de los datos de la tabla vieja 'registros'
-# ---------------------------------------------------------------------------
-def migrar_registros_antiguos():
-    """Copia los días de la tabla vieja 'registros' a las tablas nuevas.
+    anchos = {}
+    for grupo, (columna, base) in GRUPOS.items():
+      largo = pd.read_sql_query(
+          f"SELECT d.fecha AS Fecha, t.{columna} AS nombre, t.valor "
+          f"FROM {grupo} t JOIN dias_trabajo d ON d.id = t.dia_id {where}",
+          conn,
+          params=params,
+      )
 
-    - NO borra ni modifica la tabla vieja.
-    - Solo copia fechas que todavía no existen en el sistema nuevo, así que se
-      puede ejecutar varias veces sin pisar datos editados después.
-    Devuelve (migrados, omitidos).
-    """
-    with _conexion() as conn:
-        existe = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='registros'"
-        ).fetchone()
-        if existe is None:
-            return 0, 0
+      if largo.empty:
+        ancho = pd.DataFrame(columns=["Fecha"] + base).set_index("Fecha")
+      else:
+        ancho = largo.pivot_table(
+            index="Fecha", columns="nombre", values="valor", aggfunc="sum"
+        )
 
-        filas = conn.execute(
-            "SELECT fecha, didi, indrive, uber, extras, gasolina, apps, comida, "
-            "otros_gastos, efectivo, nequi FROM registros ORDER BY fecha"
-        ).fetchall()
+      nuevos = sorted(c for c in ancho.columns if c not in base)
+      anchos[grupo] = ancho.reindex(columns=base + nuevos)
 
-        migrados = omitidos = 0
-        for (fecha, didi, indrive, uber, extras, gasolina, apps, comida,
-             otros, efectivo, nequi) in filas:
-            ya_existe = conn.execute(
-                "SELECT 1 FROM dias_trabajo WHERE fecha = ?", (fecha,)
-            ).fetchone()
-            if ya_existe:
-                omitidos += 1
-                continue
-            _guardar_dia_en(
-                conn,
-                fecha,
-                ingresos={"Didi": didi, "InDrive": indrive, "Uber": uber, "Extras": extras},
-                gastos={"Gasolina": gasolina, "Apps": apps, "Comida": comida, "Otros Gastos": otros},
-                movimientos={"Efectivo": efectivo, "Nequi": nequi},
-                observaciones="",
-            )
-            migrados += 1
-        return migrados, omitidos
+  resumen = dias.set_index("Fecha")
+  observaciones = resumen.pop("Observaciones")
+
+  for grupo in GRUPOS:
+    resumen = resumen.join(anchos[grupo])
+
+  resumen = resumen.fillna(0).astype(int)
+
+  cols_ing = list(anchos["ingresos"].columns)
+  cols_gas = list(anchos["gastos"].columns)
+  cols_mov = list(anchos["movimientos"].columns)
+
+  resumen["Total Ingresos"] = (
+      resumen[cols_ing].sum(axis=1) if cols_ing else 0
+  )
+  resumen["Total Gastos"] = resumen[cols_gas].sum(axis=1) if cols_gas else 0
+  resumen["Ganancia Est"] = resumen["Total Ingresos"] - resumen["Total Gastos"]
+  resumen["Total Disp"] = resumen[cols_mov].sum(axis=1) if cols_mov else 0
+  resumen["Diferencia"] = resumen["Total Disp"] - resumen["Ganancia Est"]
+  resumen["Observaciones"] = observaciones
+
+  orden = (
+      cols_ing
+      + ["Total Ingresos"]
+      + cols_gas
+      + ["Total Gastos", "Ganancia Est"]
+      + cols_mov
+      + ["Total Disp", "Diferencia", "Observaciones"]
+  )
+
+  return resumen[orden].reset_index()
