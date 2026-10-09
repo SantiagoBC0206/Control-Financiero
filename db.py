@@ -2,12 +2,6 @@
 
 Aquí vive TODO lo que toca la base de datos. Las pantallas (Streamlit) solo
 llaman a estas funciones y nunca escriben SQL directamente.
-
-Diseño relacional flexible:
-    dias_trabajo : un registro por fecha (+ observaciones)
-    ingresos     : valor por plataforma y día   (Didi, InDrive, Uber, Extras, ...)
-    gastos       : valor por categoría y día    (Gasolina, Apps, Comida, ...)
-    movimientos  : valor por método y día       (Efectivo, Nequi, ...)
 """
 
 from contextlib import contextmanager
@@ -36,13 +30,11 @@ GRUPOS = {
 @contextmanager
 def _conexion():
   """Abre la base de datos, maneja la transacción y la cierra automáticamente."""
-  usando_postgres = False
   if DATABASE_URL:
     try:
       import psycopg2
 
       conn = psycopg2.connect(DATABASE_URL)
-      usando_postgres = True
     except Exception as e:
       st.warning(f"No se pudo conectar a Supabase/PostgreSQL, usando SQLite: {e}")
       conn = sqlite3.connect("transporte.db")
@@ -63,7 +55,6 @@ def _conexion():
 
 def _placeholder(conn):
   """Retorna el marcador de posición correcto según la base de datos usada."""
-  # %s para PostgreSQL (psycopg2), ? para SQLite
   return "%s" if type(conn).__module__.startswith("psycopg2") else "?"
 
 
@@ -85,7 +76,6 @@ def init_db():
   with _conexion() as conn:
     cursor = conn.cursor()
 
-    # Tipos de datos compatibles según el motor
     if type(conn).__module__.startswith("psycopg2"):
       pk_type = "SERIAL PRIMARY KEY"
     else:
@@ -139,7 +129,6 @@ def _guardar_dia_en(conn, fecha, ingresos, gastos, movimientos, observaciones):
   cursor = conn.cursor()
   fecha = str(fecha)
 
-  # Insertar o actualizar observaciones del día
   if type(conn).__module__.startswith("psycopg2"):
     cursor.execute(
         f"""
@@ -157,9 +146,7 @@ def _guardar_dia_en(conn, fecha, ingresos, gastos, movimientos, observaciones):
         (fecha, observaciones or ""),
     )
 
-  cursor.execute(
-      f"SELECT id FROM dias_trabajo WHERE fecha = {p}", (fecha,)
-  )
+  cursor.execute(f"SELECT id FROM dias_trabajo WHERE fecha = {p}", (fecha,))
   dia_id = cursor.fetchone()[0]
 
   for grupo, valores in (
@@ -168,16 +155,13 @@ def _guardar_dia_en(conn, fecha, ingresos, gastos, movimientos, observaciones):
       ("movimientos", movimientos),
   ):
     columna = GRUPOS[grupo][0]
-    cursor.execute(
-        f"DELETE FROM {grupo} WHERE dia_id = {p}", (dia_id,)
-    )
+    cursor.execute(f"DELETE FROM {grupo} WHERE dia_id = {p}", (dia_id,))
 
     for nombre, valor in (valores or {}).items():
       v = _entero(valor)
       if v != 0:
         cursor.execute(
-            f"INSERT INTO {grupo} (dia_id, {columna}, valor) VALUES ({p},"
-            f" {p}, {p})",
+            f"INSERT INTO {grupo} (dia_id, {columna}, valor) VALUES ({p}, {p}, {p})",
             (dia_id, str(nombre).strip(), v),
         )
 
@@ -185,9 +169,7 @@ def _guardar_dia_en(conn, fecha, ingresos, gastos, movimientos, observaciones):
 def guardar_dia(fecha, ingresos, gastos, movimientos, observaciones=""):
   """Guarda o reemplaza un día completo."""
   with _conexion() as conn:
-    _guardar_dia_en(
-        conn, fecha, ingresos, gastos, movimientos, observaciones
-    )
+    _guardar_dia_en(conn, fecha, ingresos, gastos, movimientos, observaciones)
 
 
 def guardar_varios_dias(dias):
@@ -232,9 +214,7 @@ def eliminar_dia(fecha):
   """Borra un día y todos sus registros asociados."""
   with _conexion() as conn:
     p = _placeholder(conn)
-    conn.cursor().execute(
-        f"DELETE FROM dias_trabajo WHERE fecha = {p}", (str(fecha),)
-    )
+    conn.cursor().execute(f"DELETE FROM dias_trabajo WHERE fecha = {p}", (str(fecha),))
 
 
 def nombres_disponibles(grupo):
@@ -242,9 +222,7 @@ def nombres_disponibles(grupo):
   columna, base = GRUPOS[grupo]
   with _conexion() as conn:
     cursor = conn.cursor()
-    cursor.execute(
-        f"SELECT DISTINCT {columna} FROM {grupo} ORDER BY {columna}"
-    )
+    cursor.execute(f"SELECT DISTINCT {columna} FROM {grupo} ORDER BY {columna}")
     filas = cursor.fetchall()
   return base + sorted(f[0] for f in filas if f[0] not in base)
 
@@ -266,7 +244,7 @@ def resumen_dias(desde=None, hasta=None):
 
   with _conexion() as conn:
     dias = pd.read_sql_query(
-        f"SELECT d.fecha AS Fecha, d.observaciones AS Observaciones "
+        f"SELECT d.fecha, d.observaciones "
         f"FROM dias_trabajo d {where} ORDER BY d.fecha DESC",
         conn,
         params=params,
@@ -275,10 +253,14 @@ def resumen_dias(desde=None, hasta=None):
     if dias.empty:
       return pd.DataFrame()
 
+    # Normalizar nombres de columnas a minúsculas para evitar mismatches en PostgreSQL
+    dias.columns = [c.lower() for c in dias.columns]
+    dias = dias.rename(columns={"fecha": "Fecha", "observaciones": "Observaciones"})
+
     anchos = {}
     for grupo, (columna, base) in GRUPOS.items():
       largo = pd.read_sql_query(
-          f"SELECT d.fecha AS Fecha, t.{columna} AS nombre, t.valor "
+          f"SELECT d.fecha, t.{columna} AS nombre, t.valor "
           f"FROM {grupo} t JOIN dias_trabajo d ON d.id = t.dia_id {where}",
           conn,
           params=params,
@@ -287,9 +269,11 @@ def resumen_dias(desde=None, hasta=None):
       if largo.empty:
         ancho = pd.DataFrame(columns=["Fecha"] + base).set_index("Fecha")
       else:
+        largo.columns = [c.lower() for c in largo.columns]
         ancho = largo.pivot_table(
-            index="Fecha", columns="nombre", values="valor", aggfunc="sum"
+            index="fecha", columns="nombre", values="valor", aggfunc="sum"
         )
+        ancho.index.name = "Fecha"
 
       nuevos = sorted(c for c in ancho.columns if c not in base)
       anchos[grupo] = ancho.reindex(columns=base + nuevos)
@@ -306,9 +290,7 @@ def resumen_dias(desde=None, hasta=None):
   cols_gas = list(anchos["gastos"].columns)
   cols_mov = list(anchos["movimientos"].columns)
 
-  resumen["Total Ingresos"] = (
-      resumen[cols_ing].sum(axis=1) if cols_ing else 0
-  )
+  resumen["Total Ingresos"] = resumen[cols_ing].sum(axis=1) if cols_ing else 0
   resumen["Total Gastos"] = resumen[cols_gas].sum(axis=1) if cols_gas else 0
   resumen["Ganancia Est"] = resumen["Total Ingresos"] - resumen["Total Gastos"]
   resumen["Total Disp"] = resumen[cols_mov].sum(axis=1) if cols_mov else 0
