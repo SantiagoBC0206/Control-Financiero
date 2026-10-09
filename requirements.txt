@@ -3,3 +3,4 @@ pandas
 tzdata
 openpyxl
 plotly
+psycopg2-binary
