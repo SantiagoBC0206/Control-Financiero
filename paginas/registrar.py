@@ -78,20 +78,34 @@ def _mostrar_balance(fecha):
 
 
 def mostrar():
-  # Estilo CSS personalizado para aumentar la letra aún más (~50% más grande que el estándar)
+  # CSS reforzado para sobreescribir los estilos de BaseWeb de Streamlit
   st.markdown(
       """
         <style>
-        /* Tamaño de las etiquetas (Didi, InDrive, Uber, Gasolina, etc.) */
-        .stNumberInput label, .stTextInput label {
-            font-size: 1.5rem !important;
-            font-weight: 700 !important;
+        /* 1. Títulos de los campos (Didi, InDrive, Gasolina, etc.) */
+        div[data-testid="stWidgetLabel"] label p {
+            font-size: 1.4rem !important;
+            font-weight: 800 !important;
+            color: #1E293B !important;
         }
-        /* Tamaño de los números escritos dentro de las casillas */
-        .stNumberInput input, .stTextInput input {
-            font-size: 1.55rem !important;
-            height: 3.2rem !important;
+
+        /* 2. Contenedor de la casilla de texto/número */
+        div[data-baseweb="input"] {
+            min-height: 55px !important;
+            border-radius: 8px !important;
+        }
+
+        /* 3. El texto/número digitado */
+        div[data-baseweb="input"] input {
+            font-size: 1.5rem !important;
             font-weight: bold !important;
+        }
+
+        /* 4. Botones + y - de los campos de número */
+        div[data-testid="stNumberInputStepDown"], 
+        div[data-testid="stNumberInputStepUp"] {
+            width: 40px !important;
+            height: 55px !important;
         }
         </style>
     """,
