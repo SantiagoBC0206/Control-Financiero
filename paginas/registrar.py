@@ -78,47 +78,56 @@ def _mostrar_balance(fecha):
 
 
 def mostrar():
-  # CSS específico para agrandar los rectángulos editables (cajas de entrada)
+  # CSS Forzado: Ajusta la escala de TODO el bloque de inputs (Títulos + Cajas)
   st.markdown(
       """
         <style>
-        /* 1. Agrandar las etiquetas (Títulos: Efectivo, Nequi, etc.) */
-        div[data-testid="stWidgetLabel"] label p {
-            font-size: 1.3rem !important;
-            font-weight: 700 !important;
-        }
-
-        /* 2. Agrandar el contenedor entero del rectángulo (Number Input) */
-        div[data-testid="stNumberInputContainer"] {
-            min-height: 65px !important;
-            height: 65px !important;
-            border-radius: 12px !important;
-        }
-
-        /* 3. Agrandar la caja de texto simple (Observaciones, etc.) */
-        div[data-baseweb="input"] {
-            min-height: 65px !important;
-            height: 65px !important;
-            border-radius: 12px !important;
-        }
-
-        /* 4. Agrandar la letra y número que escribes dentro de las cajas */
-        div[data-testid="stNumberInputContainer"] input,
-        div[data-baseweb="input"] input {
+        /* 1. Forzar tamaño gigante a los títulos (Efectivo, Nequi, Gasolina, etc.) */
+        div[data-testid="stMarkdownContainer"] p,
+        label[data-testid="stWidgetLabel"] p,
+        .stNumberInput label, 
+        .stTextInput label {
             font-size: 1.6rem !important;
-            font-weight: bold !important;
+            font-weight: 800 !important;
+            color: #0F172A !important;
         }
 
-        /* 5. Agrandar los botones de + y - dentro del rectángulo */
-        div[data-testid="stNumberInputStepDown"] button, 
-        div[data-testid="stNumberInputStepUp"] button {
-            width: 45px !important;
+        /* 2. Forzar altura y escala del rectángulo completo de la casilla */
+        div[data-testid="stNumberInput"], 
+        div[data-testid="stTextInput"] {
+            margin-bottom: 15px !important;
+        }
+
+        div[data-baseweb="input"], 
+        div[data-testid="stNumberInputContainer"] {
+            min-height: 75px !important;
+            height: 75px !important;
+            background-color: #F1F5F9 !important;
+            border: 2px solid #CBD5E1 !important;
+            border-radius: 12px !important;
+        }
+
+        /* 3. Forzar el tamaño de la fuente digitada dentro de la casilla */
+        div[data-baseweb="input"] input, 
+        div[data-testid="stNumberInputContainer"] input {
+            font-size: 2rem !important;
+            font-weight: 900 !important;
+            color: #000000 !important;
             height: 100% !important;
         }
-        
-        div[data-testid="stNumberInputStepDown"] button p, 
-        div[data-testid="stNumberInputStepUp"] button p {
-            font-size: 1.5rem !important;
+
+        /* 4. Forzar el tamaño de los botones + y - */
+        div[data-testid="stNumberInputStepDown"], 
+        div[data-testid="stNumberInputStepUp"],
+        div[data-testid="stNumberInputStepDown"] button, 
+        div[data-testid="stNumberInputStepUp"] button {
+            min-width: 50px !important;
+            min-height: 70px !important;
+        }
+
+        div[data-testid="stNumberInputStepDown"] button *, 
+        div[data-testid="stNumberInputStepUp"] button * {
+            font-size: 1.8rem !important;
             font-weight: bold !important;
         }
         </style>
