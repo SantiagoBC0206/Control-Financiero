@@ -1,7 +1,7 @@
 """paginas/registrar.py — Pantalla para consultar, registrar, editar y eliminar un día."""
 
-import streamlit as st
 import db
+import streamlit as st
 from utilidades import hoy, pesos
 
 # Valores iniciales para días nuevos
@@ -78,8 +78,29 @@ def _mostrar_balance(fecha):
 
 
 def mostrar():
+  # Estilo CSS personalizado para hacer la letra más grande en los campos editables
+  st.markdown(
+      """
+        <style>
+        /* Tamaño de los títulos/etiquetas de las casillas */
+        .stNumberInput label, .stTextInput label {
+            font-size: 1.25rem !important;
+            font-weight: 600 !important;
+        }
+        /* Tamaño de los números escritos dentro de las casillas */
+        .stNumberInput input, .stTextInput input {
+            font-size: 1.3rem !important;
+            height: 2.8rem !important;
+        }
+        </style>
+    """,
+      unsafe_allow_html=True,
+  )
+
   st.subheader("📱 Gestión Diaria de Trabajo")
-  fecha = st.date_input("Selecciona la Fecha", value=hoy(), format="DD/MM/YYYY")
+  fecha = st.date_input(
+      "Selecciona la Fecha", value=hoy(), format="DD/MM/YYYY"
+  )
 
   dia = db.cargar_dia(fecha)
   es_nuevo = dia is None
@@ -91,7 +112,10 @@ def mostrar():
   }
 
   if not es_nuevo:
-    st.success(f"📅 Registros encontrados para el día **{fecha.strftime('%d/%m/%Y')}**")
+    st.success(
+        f"📅 Registros encontrados para el día"
+        f" **{fecha.strftime('%d/%m/%Y')}**"
+    )
 
     # Pestañas para elegir la acción deseada
     tab_ver, tab_editar, tab_eliminar = st.tabs(
@@ -155,7 +179,9 @@ def mostrar():
         st.rerun()
 
   else:
-    st.info(f"📝 Registrando nuevo día de trabajo: **{fecha.strftime('%d/%m/%Y')}**")
+    st.info(
+        f"📝 Registrando nuevo día de trabajo: **{fecha.strftime('%d/%m/%Y')}**"
+    )
     with st.form("form_nuevo_dia"):
       ingresos = _campos(
           "ingresos", "### 📥 Ingresos", existentes["ingresos"], True, fecha
