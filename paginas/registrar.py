@@ -78,19 +78,20 @@ def _mostrar_balance(fecha):
 
 
 def mostrar():
-  # Estilo CSS personalizado para hacer la letra más grande en los campos editables
+  # Estilo CSS personalizado para aumentar la letra aún más (~50% más grande que el estándar)
   st.markdown(
       """
         <style>
-        /* Tamaño de los títulos/etiquetas de las casillas */
+        /* Tamaño de las etiquetas (Didi, InDrive, Uber, Gasolina, etc.) */
         .stNumberInput label, .stTextInput label {
-            font-size: 1.25rem !important;
-            font-weight: 600 !important;
+            font-size: 1.5rem !important;
+            font-weight: 700 !important;
         }
         /* Tamaño de los números escritos dentro de las casillas */
         .stNumberInput input, .stTextInput input {
-            font-size: 1.3rem !important;
-            height: 2.8rem !important;
+            font-size: 1.55rem !important;
+            height: 3.2rem !important;
+            font-weight: bold !important;
         }
         </style>
     """,
