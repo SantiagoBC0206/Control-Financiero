@@ -78,34 +78,48 @@ def _mostrar_balance(fecha):
 
 
 def mostrar():
-  # CSS reforzado para sobreescribir los estilos de BaseWeb de Streamlit
+  # CSS específico para agrandar los rectángulos editables (cajas de entrada)
   st.markdown(
       """
         <style>
-        /* 1. Títulos de los campos (Didi, InDrive, Gasolina, etc.) */
+        /* 1. Agrandar las etiquetas (Títulos: Efectivo, Nequi, etc.) */
         div[data-testid="stWidgetLabel"] label p {
-            font-size: 1.4rem !important;
-            font-weight: 800 !important;
-            color: #1E293B !important;
+            font-size: 1.3rem !important;
+            font-weight: 700 !important;
         }
 
-        /* 2. Contenedor de la casilla de texto/número */
+        /* 2. Agrandar el contenedor entero del rectángulo (Number Input) */
+        div[data-testid="stNumberInputContainer"] {
+            min-height: 65px !important;
+            height: 65px !important;
+            border-radius: 12px !important;
+        }
+
+        /* 3. Agrandar la caja de texto simple (Observaciones, etc.) */
         div[data-baseweb="input"] {
-            min-height: 55px !important;
-            border-radius: 8px !important;
+            min-height: 65px !important;
+            height: 65px !important;
+            border-radius: 12px !important;
         }
 
-        /* 3. El texto/número digitado */
+        /* 4. Agrandar la letra y número que escribes dentro de las cajas */
+        div[data-testid="stNumberInputContainer"] input,
         div[data-baseweb="input"] input {
-            font-size: 1.5rem !important;
+            font-size: 1.6rem !important;
             font-weight: bold !important;
         }
 
-        /* 4. Botones + y - de los campos de número */
-        div[data-testid="stNumberInputStepDown"], 
-        div[data-testid="stNumberInputStepUp"] {
-            width: 40px !important;
-            height: 55px !important;
+        /* 5. Agrandar los botones de + y - dentro del rectángulo */
+        div[data-testid="stNumberInputStepDown"] button, 
+        div[data-testid="stNumberInputStepUp"] button {
+            width: 45px !important;
+            height: 100% !important;
+        }
+        
+        div[data-testid="stNumberInputStepDown"] button p, 
+        div[data-testid="stNumberInputStepUp"] button p {
+            font-size: 1.5rem !important;
+            font-weight: bold !important;
         }
         </style>
     """,
