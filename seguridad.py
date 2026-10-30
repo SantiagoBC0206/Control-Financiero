@@ -1,3 +1,4 @@
+
 """seguridad.py — Control de acceso con contraseña y diseño estilizado."""
 
 import streamlit as st
@@ -7,17 +8,17 @@ PASSWORD_CORRECTA = "kiracamelo7"
 
 
 def verificar_password():
-  """Retorna True si el usuario ingresó la contraseña correcta."""
-  if st.session_state.get("autenticado", False):
-    return True
+    """Retorna True si el usuario ingresó la contraseña correcta."""
+    if st.session_state.get("autenticado", False):
+        return True
 
-  # Contenedor centrado para la tarjeta de Login
-  st.markdown("<br><br>", unsafe_allow_html=True)
-  col1, col2, col3 = st.columns([1, 2, 1])
+    # Contenedor centrado para la tarjeta de Login
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
 
-  with col2:
-    st.markdown(
-        """
+    with col2:
+        st.markdown(
+            """
             <div style="
                 background-color: #F0F2F6;
                 padding: 24px;
@@ -31,26 +32,42 @@ def verificar_password():
                 <p style="color: #555555; font-size: 14px; margin-top: 0;">Ingresa tu clave de acceso para continuar</p>
             </div>
             """,
-        unsafe_allow_html=True,
-    )
+            unsafe_allow_html=True,
+        )
 
-    with st.form("form_login"):
-      clave = st.text_input(
-          "🔒 Contraseña",
-          type="password",
-          placeholder="Escribe tu contraseña...",
-          label_visibility="collapsed",
-      )
-      ingresar = st.form_submit_button(
-          "🔑 INGRESAR AL SISTEMA", use_container_width=True, type="primary"
-      )
+        # Aumentar únicamente el tamaño del texto de la contraseña
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stTextInput"] input {
+                font-size: 22px !important;
+                font-weight: 600 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if ingresar:
-      if clave == PASSWORD_CORRECTA:
-        st.session_state["autenticado"] = True
-        st.success("✅ Acceso concedido")
-        st.rerun()
-      else:
-        st.error("❌ Contraseña incorrecta. Inténtalo de nuevo.")
+        with st.form("form_login"):
+            clave = st.text_input(
+                "🔒 Contraseña",
+                type="password",
+                placeholder="Escribe tu contraseña...",
+                label_visibility="collapsed",
+            )
 
-  return False
+            ingresar = st.form_submit_button(
+                "🔑 INGRESAR AL SISTEMA",
+                use_container_width=True,
+                type="primary",
+            )
+
+        if ingresar:
+            if clave == PASSWORD_CORRECTA:
+                st.session_state["autenticado"] = True
+                st.success("✅ Acceso concedido")
+                st.rerun()
+            else:
+                st.error("❌ Contraseña incorrecta. Inténtalo de nuevo.")
+
+    return False
