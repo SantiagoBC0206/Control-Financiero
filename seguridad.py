@@ -35,13 +35,35 @@ def verificar_password():
             unsafe_allow_html=True,
         )
 
-        # Aumentar únicamente el tamaño del texto de la contraseña
+        # Aumentar considerablemente el campo de contraseña
         st.markdown(
             """
             <style>
-            div[data-testid="stTextInput"] input {
-                font-size: 22px !important;
-                font-weight: 600 !important;
+            /* Campo de contraseña */
+            div[data-testid="stTextInput"] div[data-baseweb="input"] {
+                min-height: 72px !important;
+                height: 72px !important;
+            }
+
+            div[data-testid="stTextInput"] input,
+            input[type="password"] {
+                font-size: 32px !important;
+                font-weight: 700 !important;
+                line-height: 1.4 !important;
+                padding: 12px 16px !important;
+            }
+
+            /* Ajuste adicional para celulares */
+            @media screen and (max-width: 768px) {
+                div[data-testid="stTextInput"] div[data-baseweb="input"] {
+                    min-height: 78px !important;
+                    height: 78px !important;
+                }
+
+                div[data-testid="stTextInput"] input,
+                input[type="password"] {
+                    font-size: 34px !important;
+                }
             }
             </style>
             """,

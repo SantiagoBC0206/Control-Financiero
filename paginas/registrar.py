@@ -87,16 +87,71 @@ def _mostrar_balance(fecha):
 
 
 def mostrar():
-    # CSS: aumentar únicamente el tamaño de los números ingresados
+    # CSS: aumentar considerablemente los campos numéricos
+    # sin modificar los títulos ni las etiquetas.
     st.markdown(
         """
         <style>
 
-        /* Aumentar el tamaño de los números de todos los campos */
+        /* ==========================================
+           CAMPOS NUMÉRICOS
+           ========================================== */
+
+        /* Altura de las casillas */
+        div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+            min-height: 82px !important;
+            height: 82px !important;
+            border-radius: 12px !important;
+        }
+
+        /* Números escritos */
+        div[data-testid="stNumberInput"] div[data-baseweb="input"] input,
         div[data-testid="stNumberInput"] input {
-            font-size: 22px !important;
-            font-weight: 600 !important;
+            font-size: 30px !important;
+            font-weight: 700 !important;
+            line-height: 1.4 !important;
             color: #000000 !important;
+            padding: 12px 14px !important;
+        }
+
+        /* Botones de aumentar y disminuir */
+        div[data-testid="stNumberInput"] button {
+            min-width: 52px !important;
+            min-height: 76px !important;
+        }
+
+        div[data-testid="stNumberInput"] button svg {
+            width: 26px !important;
+            height: 26px !important;
+        }
+
+        /* ==========================================
+           AJUSTES ESPECÍFICOS PARA CELULARES
+           ========================================== */
+
+        @media screen and (max-width: 768px) {
+
+            div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+                min-height: 90px !important;
+                height: 90px !important;
+            }
+
+            div[data-testid="stNumberInput"] div[data-baseweb="input"] input,
+            div[data-testid="stNumberInput"] input {
+                font-size: 34px !important;
+                font-weight: 700 !important;
+                padding: 14px !important;
+            }
+
+            div[data-testid="stNumberInput"] button {
+                min-width: 54px !important;
+                min-height: 84px !important;
+            }
+
+            div[data-testid="stNumberInput"] button svg {
+                width: 30px !important;
+                height: 30px !important;
+            }
         }
 
         </style>
