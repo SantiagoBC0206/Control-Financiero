@@ -1,82 +1,260 @@
-"""
-estadisticas.py — Cálculos de resumen (día, mes, año). Solo usa pandas.
-
-Trabaja sobre el DataFrame que devuelve db.resumen_dias().
-Un día cuenta como "trabajado" si tuvo ingresos (> 0).
-
-La cifra principal es el TOTAL DISPONIBLE (el dinero real en mano). Por eso el
-promedio, el mejor día y el peor día se calculan con el disponible. La ganancia
-estimada se sigue calculando, pero como dato secundario.
-"""
 
 import pandas as pd
 
 
 def preparar(df):
-    """Agrega columnas auxiliares: fecha real, si fue trabajado y año-mes."""
+    """
+    Prepara los datos diarios para los análisis del dashboard.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df.copy()
+
     df = df.copy()
-    df["Fecha"] = pd.to_datetime(df["Fecha"])
-    df["Trabajado"] = df["Total Ingresos"] > 0
+
+    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+    df = df.dropna(subset=["Fecha"])
+    df = df.sort_values("Fecha").reset_index(drop=True)
+
+    columnas_numericas = [
+        "Total Ingresos",
+        "Total Gastos",
+        "Ganancia Est",
+        "Total Disp",
+        "Diferencia",
+        "Efectivo",
+        "Nequi",
+    ]
+
+    for columna in columnas_numericas:
+        if columna in df.columns:
+            df[columna] = pd.to_numeric(
+                df[columna], errors="coerce"
+            ).fillna(0)
+
+    if "Total Ingresos" in df.columns:
+        df["Trabajado"] = df["Total Ingresos"] > 0
+    else:
+        df["Trabajado"] = False
+
     df["AñoMes"] = df["Fecha"].dt.strftime("%Y-%m")
+
     return df
 
 
 def grupos_columnas(df):
-    """Devuelve (columnas_ingresos, columnas_gastos, columnas_movimientos)."""
-    cols = list(df.columns)
-    i_ing = cols.index("Total Ingresos")
-    i_gas = cols.index("Total Gastos")
-    i_gan = cols.index("Ganancia Est")
-    i_disp = cols.index("Total Disp")
-    return cols[1:i_ing], cols[i_ing + 1:i_gas], cols[i_gan + 1:i_disp]
+    """
+    Separa las columnas correspondientes a ingresos,
+    gastos y movimientos de dinero.
+    """
+    columnas_ingresos = [
+        "Didi",
+        "InDrive",
+        "Uber",
+        "Extras",
+    ]
+
+    columnas_gastos = [
+        "Gasolina",
+        "Apps",
+        "Comida",
+        "Otros Gastos",
+    ]
+
+    columnas_movimientos = [
+        "Efectivo",
+        "Nequi",
+    ]
+
+    ingresos = [
+        columna for columna in columnas_ingresos
+        if columna in df.columns
+    ]
+
+    gastos = [
+        columna for columna in columnas_gastos
+        if columna in df.columns
+    ]
+
+    movimientos = [
+        columna for columna in columnas_movimientos
+        if columna in df.columns
+    ]
+
+    return ingresos, gastos, movimientos
 
 
 def resumen_periodo(df):
-    """Totales y datos destacados de un conjunto de días (un mes, un año...)."""
-    ing, gas, _ = grupos_columnas(df)
-    trabajados = df[df["Trabajado"]]
-    dias = len(trabajados)
+    """
+    Calcula los indicadores generales del período seleccionado.
 
-    ganancia = int(df["Ganancia Est"].sum())
-    disponible = int(df["Total Disp"].sum())
-    resultado = {
-        "ingresos": int(df["Total Ingresos"].sum()),
-        "gastos": int(df["Total Gastos"].sum()),
-        "ganancia": ganancia,
-        "disponible": disponible,
-        "diferencia": int(df["Diferencia"].sum()),
-        "dias_trabajados": dias,
-        "promedio_dia": disponible / dias if dias else 0,  # promedio del DISPONIBLE
-        "mejor_dia": None,
-        "peor_dia": None,
-        "por_plataforma": df[ing].sum(),
-        "por_categoria": df[gas].sum(),
+    Total Disp se acumula sumando los valores diarios.
+    Efectivo y Nequi corresponden al último registro.
+    """
+    df = preparar(df)
+
+    if df.empty:
+        return {
+            "ingresos": 0,
+            "gastos": 0,
+            "ganancia": 0,
+            "disponible": 0,
+            "diferencia": 0,
+            "promedio_dia": 0,
+            "mejor_dia": None,
+            "peor_dia": None,
+            "por_plataforma": {},
+            "por_categoria": {},
+            "ultimo_registro": None,
+        }
+
+    ingresos_cols, gastos_cols, _ = grupos_columnas(df)
+
+    total_ingresos = (
+        df["Total Ingresos"].sum()
+        if "Total Ingresos" in df.columns else 0
+    )
+
+    total_gastos = (
+        df["Total Gastos"].sum()
+        if "Total Gastos" in df.columns else 0
+    )
+
+    ganancia = total_ingresos - total_gastos
+
+    # Suma de los valores diarios de dinero disponible.
+    disponible = (
+        df["Total Disp"].sum()
+        if "Total Disp" in df.columns else 0
+    )
+
+    # La diferencia también se acumula durante el período.
+    diferencia = (
+        df["Diferencia"].sum()
+        if "Diferencia" in df.columns else 0
+    )
+
+    dias_trabajados = df[df["Trabajado"]]
+
+    if not dias_trabajados.empty:
+        promedio_dia = (
+            dias_trabajados["Total Disp"].mean()
+            if "Total Disp" in dias_trabajados.columns else 0
+        )
+
+        mejor_dia = (
+            dias_trabajados.loc[
+                dias_trabajados["Ganancia Est"].idxmax()
+            ]
+            if "Ganancia Est" in dias_trabajados.columns else None
+        )
+
+        peor_dia = (
+            dias_trabajados.loc[
+                dias_trabajados["Ganancia Est"].idxmin()
+            ]
+            if "Ganancia Est" in dias_trabajados.columns else None
+        )
+    else:
+        promedio_dia = 0
+        mejor_dia = None
+        peor_dia = None
+
+    ultimo_registro = df.iloc[-1]
+
+    por_plataforma = {
+        columna: float(df[columna].sum())
+        for columna in ingresos_cols
     }
-    if dias:
-        mejor = trabajados.loc[trabajados["Total Disp"].idxmax()]
-        peor = trabajados.loc[trabajados["Total Disp"].idxmin()]
-        resultado["mejor_dia"] = (mejor["Fecha"], int(mejor["Total Disp"]))
-        resultado["peor_dia"] = (peor["Fecha"], int(peor["Total Disp"]))
-    return resultado
+
+    por_categoria = {
+        columna: float(df[columna].sum())
+        for columna in gastos_cols
+    }
+
+    return {
+        "ingresos": float(total_ingresos),
+        "gastos": float(total_gastos),
+        "ganancia": float(ganancia),
+        "disponible": float(disponible),
+        "diferencia": float(diferencia),
+        "promedio_dia": float(promedio_dia),
+        "mejor_dia": mejor_dia,
+        "peor_dia": peor_dia,
+        "por_plataforma": por_plataforma,
+        "por_categoria": por_categoria,
+        "ultimo_registro": ultimo_registro,
+    }
 
 
 def resumen_por_mes(df):
-    """Una fila por mes (ordenado). El promedio es del disponible por día trabajado."""
-    por_mes = df.groupby("AñoMes").agg(
-        Ingresos=("Total Ingresos", "sum"),
-        Gastos=("Total Gastos", "sum"),
-        Ganancia=("Ganancia Est", "sum"),
-        Disponible=("Total Disp", "sum"),
-        Dias=("Trabajado", "sum"),
+    """
+    Genera un resumen independiente para cada mes.
+
+    Total Disp se suma entre todos los registros del mes.
+    Efectivo y Nequi se conservan como saldos del último
+    registro de cada mes.
+    """
+    df = preparar(df)
+
+    if df.empty:
+        return pd.DataFrame()
+
+    columnas = [
+        "Total Ingresos",
+        "Total Gastos",
+        "Ganancia Est",
+        "Total Disp",
+        "Diferencia",
+    ]
+
+    for columna in columnas:
+        if columna not in df.columns:
+            df[columna] = 0
+
+    resumen = (
+        df.groupby("AñoMes")
+        .agg(
+            Ingresos=("Total Ingresos", "sum"),
+            Gastos=("Total Gastos", "sum"),
+            Ganancia=("Ganancia Est", "sum"),
+            Disponible=("Total Disp", "sum"),
+            Diferencia=("Diferencia", "sum"),
+            Dias=("Trabajado", "sum"),
+        )
+        .reset_index()
     )
-    por_mes["Dias"] = por_mes["Dias"].astype(int)
-    por_mes["Promedio"] = (por_mes["Disponible"] / por_mes["Dias"].where(por_mes["Dias"] > 0)).fillna(0)
-    return por_mes.sort_index()
+
+    # Promedio del dinero disponible en días trabajados.
+    promedios = (
+        df[df["Trabajado"]]
+        .groupby("AñoMes")["Total Disp"]
+        .mean()
+    )
+
+    resumen["Promedio"] = (
+        resumen["AñoMes"].map(promedios).fillna(0)
+    )
+
+    return resumen
 
 
 def dia_anterior_trabajado(df, fecha):
-    """Último día trabajado antes de 'fecha'. Devuelve la fila o None."""
-    previos = df[(df["Fecha"] < pd.Timestamp(fecha)) & df["Trabajado"]]
-    if previos.empty:
+    """
+    Obtiene el registro del día trabajado inmediatamente
+    anterior a la fecha indicada.
+    """
+    df = preparar(df)
+
+    if df.empty:
         return None
-    return previos.sort_values("Fecha").iloc[-1]
+
+    fecha = pd.to_datetime(fecha)
+
+    anteriores = df[
+        (df["Fecha"] < fecha) & (df["Trabajado"])
+    ]
+
+    if anteriores.empty:
+        return None
+
+    return anteriores.iloc[-1]
