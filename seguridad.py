@@ -1,19 +1,21 @@
 
-"""seguridad.py — Control de acceso con contraseña y diseño estilizado."""
+"""seguridad.py — Control de acceso con contraseña."""
 
 import streamlit as st
 
-# Contraseña de acceso a la aplicación
+# Mantener aquí la contraseña que ya utiliza la aplicación.
 PASSWORD_CORRECTA = "kiracamelo7"
 
 
 def verificar_password():
     """Retorna True si el usuario ingresó la contraseña correcta."""
+
     if st.session_state.get("autenticado", False):
         return True
 
     # Contenedor centrado para la tarjeta de Login
     st.markdown("<br><br>", unsafe_allow_html=True)
+
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
@@ -28,44 +30,17 @@ def verificar_password():
                 text-align: center;
                 margin-bottom: 20px;
             ">
-                <h2 style="color: #1E88E5; margin-bottom: 4px;">🚗 Control Financiero</h2>
-                <p style="color: #555555; font-size: 14px; margin-top: 0;">Ingresa tu clave de acceso para continuar</p>
+                <h2 style="color: #1E88E5; margin-bottom: 4px;">
+                    🚗 Control Financiero
+                </h2>
+                <p style="
+                    color: #555555;
+                    font-size: 14px;
+                    margin-top: 0;
+                ">
+                    Ingresa tu clave de acceso para continuar
+                </p>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Aumentar considerablemente el campo de contraseña
-        st.markdown(
-            """
-            <style>
-            /* Campo de contraseña */
-            div[data-testid="stTextInput"] div[data-baseweb="input"] {
-                min-height: 72px !important;
-                height: 72px !important;
-            }
-
-            div[data-testid="stTextInput"] input,
-            input[type="password"] {
-                font-size: 32px !important;
-                font-weight: 700 !important;
-                line-height: 1.4 !important;
-                padding: 12px 16px !important;
-            }
-
-            /* Ajuste adicional para celulares */
-            @media screen and (max-width: 768px) {
-                div[data-testid="stTextInput"] div[data-baseweb="input"] {
-                    min-height: 78px !important;
-                    height: 78px !important;
-                }
-
-                div[data-testid="stTextInput"] input,
-                input[type="password"] {
-                    font-size: 34px !important;
-                }
-            }
-            </style>
             """,
             unsafe_allow_html=True,
         )
@@ -90,6 +65,8 @@ def verificar_password():
                 st.success("✅ Acceso concedido")
                 st.rerun()
             else:
-                st.error("❌ Contraseña incorrecta. Inténtalo de nuevo.")
+                st.error(
+                    "❌ Contraseña incorrecta. Inténtalo de nuevo."
+                )
 
     return False
