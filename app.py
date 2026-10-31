@@ -10,31 +10,40 @@ import db
 from paginas import importar, inicio, registrar
 from seguridad import verificar_password
 
+
+# ==========================================================
+# CONFIGURACIÓN GENERAL
+# ==========================================================
+
 st.set_page_config(
     page_title="Control Financiero",
     page_icon="🚗",
     layout="centered",
 )
 
+
 # ==========================================================
-# ESTILOS GENERALES Y CAMPOS DE ENTRADA
+# ESTILOS GENERALES Y ADAPTACIÓN PARA CELULARES
 # ==========================================================
 
 st.markdown(
     """
     <style>
 
-    /* --------------------------------------------------
+    /* =========================================
        DISEÑO GENERAL
-    -------------------------------------------------- */
+    ========================================= */
 
     .stApp {
         background-color: #FFFFFF;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    /* Tarjetas de métricas */
-    [data-testid="stMetric"], .stMetric {
+    /* =========================================
+       MÉTRICAS FINANCIERAS
+    ========================================= */
+
+    [data-testid="stMetric"] {
         background-color: #F0F2F6 !important;
         border-radius: 12px !important;
         padding: 16px !important;
@@ -48,19 +57,26 @@ st.markdown(
         color: #1E88E5 !important;
     }
 
-    /* Botones principales */
-    .stButton > button {
+    /* =========================================
+       BOTONES PRINCIPALES
+    ========================================= */
+
+    .stButton > button,
+    .stFormSubmitButton > button {
         background-color: #1E88E5 !important;
         color: #FFFFFF !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
         border: none !important;
-        font-weight: 600 !important;
-        padding: 12px 20px !important;
-        box-shadow: 0 3px 8px rgba(30, 136, 229, 0.25) !important;
-        width: 100%;
+        font-weight: 700 !important;
+        padding: 16px 20px !important;
+        min-height: 65px !important;
+        width: 100% !important;
     }
 
-    /* Pestañas */
+    /* =========================================
+       PESTAÑAS
+    ========================================= */
+
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -77,84 +93,116 @@ st.markdown(
         color: #FFFFFF !important;
     }
 
-    /* --------------------------------------------------
-       CAMPOS NUMÉRICOS: INGRESOS, GASTOS Y DINERO
-    -------------------------------------------------- */
+    /* =========================================
+       CAMPOS NUMÉRICOS
+    ========================================= */
 
-    /* Aumentar altura de las casillas */
-    div[data-testid="stNumberInput"] div[data-baseweb="input"] {
-        height: 110px !important;
-        min-height: 110px !important;
+    [data-testid="stNumberInput"] {
+        width: 100% !important;
+        margin-bottom: 22px !important;
+    }
+
+    [data-testid="stNumberInput"] [data-baseweb="input"] {
+        min-height: 105px !important;
+        height: 105px !important;
+        background-color: #F1F5F9 !important;
+        border: 2px solid #CBD5E1 !important;
         border-radius: 14px !important;
     }
 
-    /* Aumentar números escritos */
-    div[data-testid="stNumberInput"] input {
+    [data-testid="stNumberInput"] input {
         font-size: 44px !important;
-        font-weight: 700 !important;
-        line-height: 1.2 !important;
+        font-weight: 800 !important;
         color: #000000 !important;
         height: 100% !important;
     }
 
-    /* Botones de sumar y restar */
-    div[data-testid="stNumberInput"] button {
+    /* Botones de incremento y disminución */
+
+    [data-testid="stNumberInput"] button {
         min-width: 60px !important;
         min-height: 100px !important;
     }
 
-    div[data-testid="stNumberInput"] button svg {
+    [data-testid="stNumberInput"] button svg {
         width: 30px !important;
         height: 30px !important;
     }
 
-    /* --------------------------------------------------
-       CONTRASEÑA DEL LOGIN
-       Aplicar solamente al campo password
-    -------------------------------------------------- */
+    /* =========================================
+       CAMPO DE CONTRASEÑA
+    ========================================= */
 
-    div[data-testid="stTextInput"]:has(input[type="password"])
-    div[data-baseweb="input"] {
-        height: 90px !important;
-        min-height: 90px !important;
-        border-radius: 12px !important;
-    }
-
-    div[data-testid="stTextInput"]:has(input[type="password"]) input {
+    [data-testid="stTextInput"] input[type="password"] {
         font-size: 40px !important;
-        font-weight: 700 !important;
-        color: #000000 !important;
-        height: 100% !important;
+        font-weight: 800 !important;
+        min-height: 85px !important;
     }
 
-    /* --------------------------------------------------
-       AJUSTES PARA CELULARES
-    -------------------------------------------------- */
+    [data-testid="stTextInput"]:has(input[type="password"])
+    [data-baseweb="input"] {
+        min-height: 90px !important;
+        height: 90px !important;
+        border-radius: 14px !important;
+    }
+
+    /* =========================================
+       OTROS CAMPOS DE TEXTO
+    ========================================= */
+
+    [data-testid="stTextInput"] input:not([type="password"]) {
+        font-size: 24px !important;
+        min-height: 65px !important;
+    }
+
+    /* =========================================
+       ADAPTACIÓN PARA CELULARES
+    ========================================= */
 
     @media screen and (max-width: 768px) {
 
-        div[data-testid="stNumberInput"] div[data-baseweb="input"] {
-            height: 110px !important;
+        /* Campos numéricos */
+
+        [data-testid="stNumberInput"] [data-baseweb="input"] {
             min-height: 110px !important;
+            height: 110px !important;
         }
 
-        div[data-testid="stNumberInput"] input {
+        [data-testid="stNumberInput"] input {
             font-size: 44px !important;
+            font-weight: 800 !important;
         }
 
-        div[data-testid="stNumberInput"] button {
-            min-width: 60px !important;
-            min-height: 100px !important;
+        /* Botones + y - */
+
+        [data-testid="stNumberInput"] button {
+            min-width: 65px !important;
+            min-height: 105px !important;
         }
 
-        div[data-testid="stTextInput"]:has(input[type="password"])
-        div[data-baseweb="input"] {
-            height: 90px !important;
-            min-height: 90px !important;
+        [data-testid="stNumberInput"] button svg {
+            width: 32px !important;
+            height: 32px !important;
         }
 
-        div[data-testid="stTextInput"]:has(input[type="password"]) input {
+        /* Contraseña */
+
+        [data-testid="stTextInput"] input[type="password"] {
             font-size: 40px !important;
+        }
+
+        [data-testid="stTextInput"]:has(input[type="password"])
+        [data-baseweb="input"] {
+            min-height: 95px !important;
+            height: 95px !important;
+        }
+
+        /* Botones de guardar e ingresar */
+
+        .stFormSubmitButton > button,
+        .stButton > button {
+            min-height: 75px !important;
+            font-size: 22px !important;
         }
     }
 
@@ -165,7 +213,7 @@ st.markdown(
 
 
 # ==========================================================
-# 1. ACCESO CON CONTRASEÑA
+# ACCESO AL SISTEMA
 # ==========================================================
 
 if not verificar_password():
@@ -173,14 +221,14 @@ if not verificar_password():
 
 
 # ==========================================================
-# 2. ASEGURAR QUE LAS TABLAS EXISTAN
+# INICIALIZAR BASE DE DATOS
 # ==========================================================
 
 db.init_db()
 
 
 # ==========================================================
-# 3. MENÚ PRINCIPAL
+# MENÚ PRINCIPAL
 # ==========================================================
 
 PAGINAS = {
@@ -188,6 +236,11 @@ PAGINAS = {
     "➕ Registrar día": registrar.mostrar,
     "📥 Importar Excel": importar.mostrar,
 }
+
+
+# ==========================================================
+# MOSTRAR APLICACIÓN
+# ==========================================================
 
 st.title("🚗 Control Financiero")
 
