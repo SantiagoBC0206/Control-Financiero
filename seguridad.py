@@ -3,7 +3,7 @@
 
 import streamlit as st
 
-# Mantener aquí la contraseña que ya utiliza la aplicación.
+# Conserva aquí la contraseña que ya utiliza tu aplicación.
 PASSWORD_CORRECTA = "kiracamelo7"
 
 
@@ -13,44 +13,57 @@ def verificar_password():
     if st.session_state.get("autenticado", False):
         return True
 
-    # Contenedor centrado para la tarjeta de Login
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    # Espacio superior moderado.
+    st.markdown(
+        '<div class="login-espacio-superior"></div>',
+        unsafe_allow_html=True,
+    )
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1.7, 1])
 
     with col2:
+
+        # Encabezado de acceso.
         st.markdown(
             """
-            <div style="
-                background-color: #F0F2F6;
-                padding: 24px;
-                border-radius: 16px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-                border: 1px solid #E0E0E0;
-                text-align: center;
-                margin-bottom: 20px;
-            ">
-                <h2 style="color: #1E88E5; margin-bottom: 4px;">
-                    🚗 Control Financiero
-                </h2>
-                <p style="
-                    color: #555555;
-                    font-size: 14px;
-                    margin-top: 0;
-                ">
-                    Ingresa tu clave de acceso para continuar
+            <div class="login-header">
+                <div class="login-icono">🚗</div>
+
+                <h1>Control Financiero</h1>
+
+                <p>
+                    Gestiona tus registros y consulta
+                    tu información financiera.
                 </p>
+
+                <div class="login-separador"></div>
+
+                <span class="login-seguridad">
+                    🔒 ACCESO PRIVADO
+                </span>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+        # Formulario.
         with st.form("form_login"):
+
+            st.markdown(
+                """
+                <div class="login-label">
+                    Ingresa tu contraseña aquí
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
             clave = st.text_input(
-                "🔒 Contraseña",
+                "Contraseña",
                 type="password",
                 placeholder="Escribe tu contraseña...",
                 label_visibility="collapsed",
+                key="login_password",
             )
 
             ingresar = st.form_submit_button(
@@ -59,14 +72,20 @@ def verificar_password():
                 type="primary",
             )
 
+        # Validación.
         if ingresar:
+
             if clave == PASSWORD_CORRECTA:
+
                 st.session_state["autenticado"] = True
-                st.success("✅ Acceso concedido")
+
                 st.rerun()
+
             else:
+
                 st.error(
-                    "❌ Contraseña incorrecta. Inténtalo de nuevo."
+                    "Contraseña incorrecta. "
+                    "Verifica e inténtalo nuevamente."
                 )
 
     return False
