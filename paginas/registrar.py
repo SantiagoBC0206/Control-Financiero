@@ -5,7 +5,6 @@ import db
 import streamlit as st
 from utilidades import hoy, pesos
 
-
 # Valores iniciales para días nuevos
 VALORES_INICIALES_DIA_NUEVO = {"Gasolina": 60000}
 
@@ -14,7 +13,6 @@ def _campos(grupo, titulo, existentes, es_nuevo, fecha):
     """Dibuja campos numéricos para ingresar valores."""
 
     st.markdown(titulo)
-
     valores = {}
     columnas = st.columns(2)
 
@@ -52,13 +50,11 @@ def _mostrar_balance(fecha):
     st.markdown("---")
     st.markdown("### 💰 CUADRE DE CAJA Y DINERO DISPONIBLE")
 
-    # 1. Total disponible
     st.metric(
         "💵 TOTAL DISPONIBLE EN CAJA",
-        pesos(fila.get("Total Disp", 0)),
+        pesos(fila.get("Total Disp", 0))
     )
 
-    # 2. Desglose de efectivo y Nequi
     dia = db.cargar_dia(fecha)
     movs = dia.get("movimientos", {}) if dia else {}
 
@@ -73,43 +69,21 @@ def _mostrar_balance(fecha):
 
     col_e, col_n = st.columns(2)
 
-    col_e.metric(
-        "💵 Recibido Efectivo",
-        pesos(val_efectivo),
-    )
-
-    col_n.metric(
-        "📱 Recibido Nequi / Bancos",
-        pesos(val_nequi),
-    )
+    col_e.metric("💵 Recibido Efectivo", pesos(val_efectivo))
+    col_n.metric("📱 Recibido Nequi / Bancos", pesos(val_nequi))
 
     st.markdown("---")
     st.markdown("##### 📊 Resumen Financiero Adicional")
 
-    # 3. Métricas secundarias
     c1, c2 = st.columns(2)
 
-    c1.metric(
-        "📥 Total Ingresos",
-        pesos(fila.get("Total Ingresos", 0)),
-    )
-
-    c2.metric(
-        "📤 Total Gastos",
-        pesos(fila.get("Total Gastos", 0)),
-    )
+    c1.metric("📥 Total Ingresos", pesos(fila.get("Total Ingresos", 0)))
+    c2.metric("📤 Total Gastos", pesos(fila.get("Total Gastos", 0)))
 
     c3, c4 = st.columns(2)
 
-    c3.metric(
-        "📈 Ganancia Estimada",
-        pesos(fila.get("Ganancia Est", 0)),
-    )
-
-    c4.metric(
-        "⚖️ Diferencia de Caja",
-        pesos(fila.get("Diferencia", 0)),
-    )
+    c3.metric("📈 Ganancia Estimada", pesos(fila.get("Ganancia Est", 0)))
+    c4.metric("⚖️ Diferencia de Caja", pesos(fila.get("Diferencia", 0)))
 
     obs = dia.get("observaciones", "") if dia else ""
 
@@ -118,13 +92,102 @@ def _mostrar_balance(fecha):
 
 
 def mostrar():
+    """Muestra la pantalla de gestión diaria."""
+
+    # ======================================================
+    # TAMAÑO DE LOS CAMPOS NUMÉRICOS
+    # ======================================================
+
+    st.markdown(
+        """
+        <style>
+
+        /* Separación entre campos numéricos */
+        div[data-testid="stNumberInput"] {
+            margin-bottom: 12px !important;
+            width: 100% !important;
+        }
+
+        /* Tamaño general de las casillas */
+        div[data-testid="stNumberInput"]
+        div[data-baseweb="input"] {
+            min-height: 68px !important;
+            height: 68px !important;
+            background-color: #F1F5F9 !important;
+            border: 2px solid #CBD5E1 !important;
+            border-radius: 12px !important;
+        }
+
+        /* Tamaño de los números */
+        div[data-testid="stNumberInput"]
+        div[data-baseweb="input"] input {
+            font-size: 26px !important;
+            font-weight: 700 !important;
+            color: #000000 !important;
+            height: 64px !important;
+        }
+
+        /* Botones de incremento y disminución */
+        div[data-testid="stNumberInput"] button {
+            min-width: 42px !important;
+            width: 42px !important;
+            min-height: 64px !important;
+            height: 64px !important;
+        }
+
+        /* Iconos de los botones */
+        div[data-testid="stNumberInput"] button svg {
+            width: 20px !important;
+            height: 20px !important;
+        }
+
+        /* Adaptación específica para celulares */
+        @media screen and (max-width: 768px) {
+
+            div[data-testid="stNumberInput"] {
+                margin-bottom: 14px !important;
+            }
+
+            div[data-testid="stNumberInput"]
+            div[data-baseweb="input"] {
+                min-height: 68px !important;
+                height: 68px !important;
+            }
+
+            div[data-testid="stNumberInput"]
+            div[data-baseweb="input"] input {
+                font-size: 28px !important;
+                font-weight: 700 !important;
+            }
+
+            div[data-testid="stNumberInput"] button {
+                min-width: 40px !important;
+                width: 40px !important;
+                min-height: 64px !important;
+                height: 64px !important;
+            }
+
+            div[data-testid="stNumberInput"] button svg {
+                width: 20px !important;
+                height: 20px !important;
+            }
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ======================================================
+    # GESTIÓN DIARIA
+    # ======================================================
 
     st.subheader("📱 Gestión Diaria de Trabajo")
 
     fecha = st.date_input(
         "Selecciona la Fecha",
         value=hoy(),
-        format="DD/MM/YYYY",
+        format="DD/MM/YYYY"
     )
 
     dia = db.cargar_dia(fecha)
@@ -144,29 +207,16 @@ def mostrar():
     if not es_nuevo:
 
         st.success(
-            f"📅 Registros encontrados para el día"
-            f" **{fecha.strftime('%d/%m/%Y')}**"
+            f"📅 Registros encontrados para el día "
+            f"**{fecha.strftime('%d/%m/%Y')}**"
         )
 
-        # Pestañas de acciones
         tab_ver, tab_editar, tab_eliminar = st.tabs(
-            [
-                "👁️ Visualizar",
-                "✏️ Editar Día",
-                "🗑️ Eliminar Día",
-            ]
+            ["👁️ Visualizar", "✏️ Editar Día", "🗑️ Eliminar Día"]
         )
-
-        # ----------------------------------------------
-        # VISUALIZAR
-        # ----------------------------------------------
 
         with tab_ver:
             _mostrar_balance(fecha)
-
-        # ----------------------------------------------
-        # EDITAR
-        # ----------------------------------------------
 
         with tab_editar:
 
@@ -224,15 +274,11 @@ def mostrar():
 
                 st.rerun()
 
-        # ----------------------------------------------
-        # ELIMINAR
-        # ----------------------------------------------
-
         with tab_eliminar:
 
             st.error(
-                "⚠️ **Atención:** Esta acción eliminará permanentemente todos los"
-                " registros de este día."
+                "⚠️ **Atención:** Esta acción eliminará permanentemente "
+                "todos los registros de este día."
             )
 
             confirmar_borrado = st.checkbox(
@@ -261,7 +307,8 @@ def mostrar():
     else:
 
         st.info(
-            f"📝 Registrando nuevo día de trabajo: **{fecha.strftime('%d/%m/%Y')}**"
+            f"📝 Registrando nuevo día de trabajo: "
+            f"**{fecha.strftime('%d/%m/%Y')}**"
         )
 
         with st.form("form_nuevo_dia"):
