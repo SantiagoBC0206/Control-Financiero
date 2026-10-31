@@ -95,20 +95,19 @@ def mostrar():
     """Muestra la pantalla de gestión diaria."""
 
     # ======================================================
-    # TAMAÑO DE LOS CAMPOS NUMÉRICOS
+    # ESTILOS DE CAMPOS NUMÉRICOS
     # ======================================================
 
     st.markdown(
         """
         <style>
 
-        /* Separación entre campos numéricos */
         div[data-testid="stNumberInput"] {
             margin-bottom: 12px !important;
             width: 100% !important;
         }
 
-        /* Tamaño general de las casillas */
+        /* Casilla numérica */
         div[data-testid="stNumberInput"]
         div[data-baseweb="input"] {
             min-height: 68px !important;
@@ -116,23 +115,32 @@ def mostrar():
             background-color: #F1F5F9 !important;
             border: 2px solid #CBD5E1 !important;
             border-radius: 12px !important;
+            display: flex !important;
+            align-items: center !important;
         }
 
-        /* Tamaño de los números */
+        /* Números */
         div[data-testid="stNumberInput"]
         div[data-baseweb="input"] input {
-            font-size: 26px !important;
+            font-size: 28px !important;
             font-weight: 700 !important;
             color: #000000 !important;
             height: 64px !important;
         }
 
-        /* Botones de incremento y disminución */
+        /* Botones + y - centrados verticalmente */
         div[data-testid="stNumberInput"] button {
-            min-width: 42px !important;
-            width: 42px !important;
-            min-height: 64px !important;
-            height: 64px !important;
+            min-width: 40px !important;
+            width: 40px !important;
+            min-height: 48px !important;
+            height: 48px !important;
+            align-self: center !important;
+            position: relative !important;
+            top: -7px !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
         }
 
         /* Iconos de los botones */
@@ -141,7 +149,7 @@ def mostrar():
             height: 20px !important;
         }
 
-        /* Adaptación específica para celulares */
+        /* Adaptación para celulares */
         @media screen and (max-width: 768px) {
 
             div[data-testid="stNumberInput"] {
@@ -163,8 +171,9 @@ def mostrar():
             div[data-testid="stNumberInput"] button {
                 min-width: 40px !important;
                 width: 40px !important;
-                min-height: 64px !important;
-                height: 64px !important;
+                min-height: 48px !important;
+                height: 48px !important;
+                top: -7px !important;
             }
 
             div[data-testid="stNumberInput"] button svg {
