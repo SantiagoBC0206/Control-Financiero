@@ -1,6 +1,5 @@
 
 import io
-from datetime import date
 
 import pandas as pd
 import plotly.express as px
@@ -36,7 +35,6 @@ def convertir_df_a_excel(df):
 
     df_export = df.copy()
 
-    # Eliminar columnas auxiliares del análisis.
     columnas_auxiliares = [
         "Trabajado",
         "AñoMes",
@@ -53,25 +51,20 @@ def convertir_df_a_excel(df):
         errors="ignore",
     )
 
-    # Formato de fecha para Excel.
     if "Fecha" in df_export.columns:
         df_export["Fecha"] = pd.to_datetime(
             df_export["Fecha"], errors="coerce"
         ).dt.strftime("%d/%m/%Y")
 
-    # Crear libro.
     wb = Workbook()
     ws = wb.active
     ws.title = "Control Financiero"
 
-    # Colores.
     azul = "17365D"
     azul_claro = "D9EAF7"
-    verde = "E2F0D9"
     gris = "F2F2F2"
     blanco = "FFFFFF"
 
-    # Título.
     ws.merge_cells(
         start_row=1,
         start_column=1,
@@ -97,7 +90,6 @@ def convertir_df_a_excel(df):
 
     ws.row_dimensions[1].height = 30
 
-    # Encabezados.
     fila_encabezados = 3
 
     for columna, nombre in enumerate(
@@ -124,7 +116,6 @@ def convertir_df_a_excel(df):
             vertical="center",
         )
 
-    # Datos.
     for fila, registro in enumerate(
         df_export.itertuples(index=False, name=None),
         start=fila_encabezados + 1,
@@ -147,7 +138,6 @@ def convertir_df_a_excel(df):
                     fgColor=gris,
                 )
 
-    # Fila de totales.
     fila_total = fila_encabezados + len(df_export) + 1
 
     ws.cell(
@@ -196,7 +186,6 @@ def convertir_df_a_excel(df):
         ).fillna(0)
 
         if nombre in columnas_saldo_final:
-            # Saldo del último día registrado.
             total = pd.to_numeric(
                 ultimo_registro[nombre],
                 errors="coerce",
@@ -205,7 +194,6 @@ def convertir_df_a_excel(df):
             total = 0 if pd.isna(total) else total
 
         else:
-            # Acumulación del período.
             total = valores.sum()
 
         celda = ws.cell(
@@ -221,7 +209,6 @@ def convertir_df_a_excel(df):
             fgColor=azul_claro,
         )
 
-    # Formato de moneda.
     columnas_texto = [
         "Fecha",
         "Observaciones",
@@ -240,7 +227,6 @@ def convertir_df_a_excel(df):
                     columna,
                 ).number_format = '"$"#,##0'
 
-    # Ajustar anchos.
     for columna, nombre in enumerate(
         df_export.columns, start=1
     ):
@@ -256,17 +242,14 @@ def convertir_df_a_excel(df):
             get_column_letter(columna)
         ].width = ancho
 
-    # Congelar encabezados.
     ws.freeze_panes = "A4"
 
-    # Filtros.
     ws.auto_filter.ref = (
         f"A{fila_encabezados}:"
         f"{get_column_letter(len(df_export.columns))}"
         f"{fila_encabezados + len(df_export)}"
     )
 
-    # Bordes.
     borde = Border(
         bottom=Side(
             style="thin",
@@ -281,7 +264,6 @@ def convertir_df_a_excel(df):
         for celda in fila:
             celda.border = borde
 
-    # Crear archivo en memoria.
     archivo = io.BytesIO()
 
     wb.save(archivo)
@@ -481,8 +463,17 @@ def mostrar():
         df_filtrado["Trabajado"].sum()
     )
 
-    promedio_ganancia = (
-        resumen["ganancia"] / total_dias_trabajados
+    # Promedio de ingresos por día trabajado.
+    promedio_ingresos = (
+        resumen["ingresos"] / total_dias_trabajados
+        if total_dias_trabajados > 0
+        else 0
+    )
+
+    # Promedio disponible:
+    # suma del total disponible / días trabajados.
+    promedio_disponible = (
+        resumen["disponible"] / total_dias_trabajados
         if total_dias_trabajados > 0
         else 0
     )
@@ -583,14 +574,14 @@ def mostrar():
 
     with c1:
         st.metric(
-            "Promedio disponible diario",
-            pesos(resumen["promedio_dia"]),
+            "Promedio de ingresos diario",
+            pesos(promedio_ingresos),
         )
 
     with c2:
         st.metric(
-            "Promedio de ganancia por día trabajado",
-            pesos(promedio_ganancia),
+            "Promedio disponible diario",
+            pesos(promedio_disponible),
         )
 
     with c3:
@@ -711,7 +702,6 @@ def mostrar():
 
     col1, col2 = st.columns(2)
 
-    # Ingresos por plataforma.
     with col1:
 
         st.markdown("**Ingresos por plataforma**")
@@ -757,7 +747,6 @@ def mostrar():
                 "No hay ingresos registrados por plataforma."
             )
 
-    # Gastos por categoría.
     with col2:
 
         st.markdown("**Gastos por categoría**")
