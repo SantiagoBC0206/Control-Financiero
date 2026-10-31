@@ -1,10 +1,11 @@
 
 """seguridad.py — Control de acceso con contraseña."""
 
+import textwrap
 import streamlit as st
 
 # Conserva aquí la contraseña que ya utiliza tu aplicación.
-PASSWORD_CORRECTA = "kiracamelo7"
+PASSWORD_CORRECTA = "aqui va la contra"
 
 
 def verificar_password():
@@ -13,7 +14,6 @@ def verificar_password():
     if st.session_state.get("autenticado", False):
         return True
 
-    # Espacio superior moderado.
     st.markdown(
         '<div class="login-espacio-superior"></div>',
         unsafe_allow_html=True,
@@ -23,38 +23,38 @@ def verificar_password():
 
     with col2:
 
-        # Encabezado de acceso.
+        # Encabezado visual del inicio de sesión.
+        encabezado = """
+        <div class="login-header">
+            <div class="login-icono">🚗</div>
+
+            <h1>Control Financiero</h1>
+
+            <p>
+                Gestiona tus registros y consulta
+                tu información financiera.
+            </p>
+
+            <div class="login-separador"></div>
+
+            <span class="login-seguridad">
+                🔒 ACCESO PRIVADO
+            </span>
+        </div>
+        """
+
         st.markdown(
-            """
-            <div class="login-header">
-                <div class="login-icono">🚗</div>
-
-                <h1>Control Financiero</h1>
-
-                <p>
-                    Gestiona tus registros y consulta
-                    tu información financiera.
-                </p>
-
-                <div class="login-separador"></div>
-
-                <span class="login-seguridad">
-                    🔒 ACCESO PRIVADO
-                </span>
-            </div>
-            """,
+            textwrap.dedent(encabezado),
             unsafe_allow_html=True,
         )
 
-        # Formulario.
+        # Formulario de acceso.
         with st.form("form_login"):
 
             st.markdown(
-                """
-                <div class="login-label">
-                    Ingresa tu contraseña aquí
-                </div>
-                """,
+                '<div class="login-label">'
+                'Ingresa tu contraseña aquí'
+                '</div>',
                 unsafe_allow_html=True,
             )
 
@@ -72,13 +72,12 @@ def verificar_password():
                 type="primary",
             )
 
-        # Validación.
+        # Validación de contraseña.
         if ingresar:
 
             if clave == PASSWORD_CORRECTA:
 
                 st.session_state["autenticado"] = True
-
                 st.rerun()
 
             else:
