@@ -5,7 +5,7 @@ import streamlit as st
 
 
 # Conserva aquí la contraseña real que utiliza tu aplicación.
-PASSWORD_CORRECTA = "aqui va la contra"
+PASSWORD_CORRECTA = "kiracamelo7"
 
 
 def verificar_password():

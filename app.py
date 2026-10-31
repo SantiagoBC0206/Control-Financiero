@@ -7,7 +7,7 @@ Ejecutar con: streamlit run app.py
 import streamlit as st
 
 import db
-from paginas import importar, inicio, registrar
+from paginas import importar, inicio, registrar, analisis
 from seguridad import verificar_password
 
 
@@ -377,6 +377,7 @@ PAGINAS = {
     "🏠 Inicio": inicio.mostrar,
     "➕ Registrar día": registrar.mostrar,
     "📥 Importar Excel": importar.mostrar,
+    "📊 Análisis financiero": analisis.mostrar,
 }
 
 
